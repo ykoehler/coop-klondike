@@ -64,4 +64,89 @@ void main() {
       expect(state.isWon, true);
     });
   });
+
+  group('DrawMode', () {
+    test('DrawMode enum has correct values', () {
+      expect(DrawMode.one.index, 0);
+      expect(DrawMode.three.index, 1);
+      expect(DrawMode.values.length, 2);
+    });
+  });
+
+  group('gameId', () {
+    test('gameId is generated when not provided', () {
+      final state = GameState();
+      expect(state.gameId, isNotNull);
+      expect(state.gameId, isNotEmpty);
+    });
+
+    test('gameId uses provided value', () {
+      const customId = 'TEST1-TEST2';
+      final state = GameState(gameId: customId);
+      expect(state.gameId, customId);
+    });
+
+    test('generated gameId has correct format', () {
+      final state = GameState();
+      final id = state.gameId;
+      expect(id.length, 11); // 5-5 with dash
+      expect(id.substring(5, 6), '-');
+      final part1 = id.substring(0, 5);
+      final part2 = id.substring(6, 11);
+      expect(_isValidGameIdPart(part1), true);
+      expect(_isValidGameIdPart(part2), true);
+    });
+
+    test('seeded game produces consistent layout', () {
+      const seed = 'SEED1-SEED2';
+      final state1 = GameState(gameId: seed);
+      final state2 = GameState(gameId: seed);
+
+      // Compare tableau layouts
+      for (int i = 0; i < state1.tableau.length; i++) {
+        expect(state1.tableau[i].cards.length, state2.tableau[i].cards.length);
+        for (int j = 0; j < state1.tableau[i].cards.length; j++) {
+          expect(state1.tableau[i].cards[j].suit, state2.tableau[i].cards[j].suit);
+          expect(state1.tableau[i].cards[j].rank, state2.tableau[i].cards[j].rank);
+        }
+      }
+    });
+
+    test('different seeds produce different layouts', () {
+      final state1 = GameState(gameId: 'SEED1-SEED2');
+      final state2 = GameState(gameId: 'DIFF1-DIFF2');
+
+      // At least one card should be different (highly likely)
+      bool different = false;
+      for (int i = 0; i < state1.tableau.length && !different; i++) {
+        for (int j = 0; j < state1.tableau[i].cards.length && !different; j++) {
+          if (state1.tableau[i].cards[j].suit != state2.tableau[i].cards[j].suit ||
+              state1.tableau[i].cards[j].rank != state2.tableau[i].cards[j].rank) {
+            different = true;
+          }
+        }
+      }
+      expect(different, true);
+    });
+  });
+
+  group('DrawMode in GameState', () {
+    test('default drawMode is one', () {
+      final state = GameState();
+      expect(state.drawMode, DrawMode.one);
+    });
+
+    test('drawMode can be set to three', () {
+      final state = GameState(drawMode: DrawMode.three);
+      expect(state.drawMode, DrawMode.three);
+    });
+  });
+}
+
+bool _isValidGameIdPart(String part) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  for (final char in part.split('')) {
+    if (!chars.contains(char)) return false;
+  }
+  return true;
 }

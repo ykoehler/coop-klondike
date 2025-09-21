@@ -1,0 +1,12 @@
+- on a drag & drop fail, create an animation showing the currently dragged cards returning to their original location
+- on a drag operation, create a transaprent "shadow" following the drag cards as to create a depth effect.
+- create a visual depth effect for the stock, where we can see how many cards in the stock are left.
+- same for the waste, show 1 or 3 card depth depending on the mode, in 3-draw card mode stack the card visually so that the user see the other 2 card number and type.
+- use the Google Material 3 design (add to AGENTS.md and memory-bank as well)
+- the tableau show the tableau column card stacked, the stacked carded that are hiddent takes too much vertical space, I think the hiddent card stack should be differnt and use less vertical space than the cards that are face up (visible)
+- when a card is added to the piles, I need a visual effect, maybe surrinding the pile to attack the eye.
+- the game must be aware if a move is actually possible, and if not, must mark the game as over.
+- add sounds, optionaly, there should be int he setting the possiblity to control the sounds's volume, sound on/off in the settings and in game.
+- sounds should be added when a card is pick to be dragged from anywhere and there should be sounds when a card is successfully drop somewhere or when it is unsuccessfully drop somwhere
+- sounds should exists when the game is won
+- sounds should exists when the game is over

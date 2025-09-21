@@ -13,7 +13,7 @@ class StockPileWidget extends StatelessWidget {
     final hasCards = !provider.gameState.stock.isEmpty;
 
     return GestureDetector(
-      onTap: hasCards ? () => provider.drawCard() : null,
+      onTap: hasCards ? () => provider.drawCard() : (provider.gameState.waste.isNotEmpty ? () => provider.recycleWaste() : null),
       child: Container(
         width: 80,
         height: 112,

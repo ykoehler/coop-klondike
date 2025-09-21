@@ -12,8 +12,8 @@ void main() {
     });
 
     test('canDrawCard and drawCard', () {
-      expect(GameLogic.canDrawCard(state), true);
-      GameLogic.drawCard(state);
+      expect(GameLogic.canDrawCard(state, DrawMode.one), true);
+      GameLogic.drawCard(state, DrawMode.one);
       expect(state.waste.length, 1);
       expect(state.waste.last.faceUp, true);
     });
@@ -23,7 +23,7 @@ void main() {
       while (!state.stock.isEmpty) {
         state.stock.drawCard();
       }
-      expect(GameLogic.canDrawCard(state), false);
+      expect(GameLogic.canDrawCard(state, DrawMode.one), false);
     });
 
     test('canMoveWasteToTableau and moveWasteToTableau', () {
@@ -164,6 +164,121 @@ void main() {
         }
       }
       expect(GameLogic.isGameWon(state), true);
+    });
+
+    test('canRecycleWaste returns true when stock is empty and waste is not empty', () {
+      // Empty stock
+      while (!state.stock.isEmpty) {
+        state.stock.drawCard();
+      }
+      // Add cards to waste
+      state.waste.add(Card(suit: Suit.hearts, rank: Rank.ace));
+      state.waste.add(Card(suit: Suit.spades, rank: Rank.king));
+
+      expect(GameLogic.canRecycleWaste(state), true);
+    });
+
+    test('canRecycleWaste returns false when stock is not empty', () {
+      // Stock has cards (default state)
+      state.waste.add(Card(suit: Suit.hearts, rank: Rank.ace));
+
+      expect(GameLogic.canRecycleWaste(state), false);
+    });
+
+    test('canRecycleWaste returns false when waste is empty', () {
+      // Empty stock
+      while (!state.stock.isEmpty) {
+        state.stock.drawCard();
+      }
+      // Waste is empty
+
+      expect(GameLogic.canRecycleWaste(state), false);
+    });
+
+    test('canRecycleWaste returns false when both stock and waste are empty', () {
+      // Empty stock
+      while (!state.stock.isEmpty) {
+        state.stock.drawCard();
+      }
+      // Waste is empty
+
+      expect(GameLogic.canRecycleWaste(state), false);
+    });
+
+    test('recycleWaste moves all waste cards to stock in reverse order', () {
+      // Empty stock
+      while (!state.stock.isEmpty) {
+        state.stock.drawCard();
+      }
+
+      // Add cards to waste in specific order
+      final card1 = Card(suit: Suit.hearts, rank: Rank.ace);
+      final card2 = Card(suit: Suit.spades, rank: Rank.king);
+      final card3 = Card(suit: Suit.diamonds, rank: Rank.queen);
+      state.waste.add(card1);
+      state.waste.add(card2);
+      state.waste.add(card3);
+
+      expect(state.stock.isEmpty, true);
+      expect(state.waste.length, 3);
+
+      GameLogic.recycleWaste(state);
+
+      expect(state.waste.isEmpty, true);
+      expect(state.stock.length, 3);
+
+      // Cards should be in reverse order (last added to waste becomes first in stock)
+      expect(state.stock.drawCard(), card3);
+      expect(state.stock.drawCard(), card2);
+      expect(state.stock.drawCard(), card1);
+    });
+
+    test('recycleWaste does nothing when cannot recycle', () {
+      // Stock has cards, waste has cards - cannot recycle
+      state.waste.add(Card(suit: Suit.hearts, rank: Rank.ace));
+      final initialStockLength = state.stock.length;
+      final initialWasteLength = state.waste.length;
+
+      GameLogic.recycleWaste(state);
+
+      expect(state.stock.length, initialStockLength);
+      expect(state.waste.length, initialWasteLength);
+    });
+
+    test('isGameStuck returns false when game is won', () {
+      // Fill foundations to win the game
+      for (final pile in state.foundations) {
+        for (int i = 0; i < 13; i++) {
+          final rank = Rank.values[i];
+          final card = Card(suit: pile.suit, rank: rank);
+          pile.addCard(card);
+        }
+      }
+      expect(GameLogic.isGameStuck(state), false);
+    });
+
+    test('isGameStuck returns false when moves are available', () {
+      // Default state should have moves available
+      expect(GameLogic.isGameStuck(state), false);
+    });
+
+    test('isGameStuck returns true when no moves are possible and game is not won', () {
+      // Create a stuck state: empty stock, empty waste,
+      // tableau with cards that can't move to each other or foundation
+      while (!state.stock.isEmpty) {
+        state.stock.drawCard();
+      }
+      state.waste.clear();
+
+      // Clear tableau and set up cards that can't move
+      for (int i = 0; i < 7; i++) {
+        state.tableau[i].cards.clear();
+        // Add a king to each column - kings can't move since no empty columns and not aces
+        state.tableau[i].addCard(Card(suit: Suit.hearts, rank: Rank.king, faceUp: true));
+      }
+
+      expect(GameLogic.isGameWon(state), false);
+      expect(GameLogic.isGameStuck(state), true);
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'card.dart';
 
 class Deck {
@@ -16,8 +17,9 @@ class Deck {
     }
   }
 
-  void shuffle() {
-    _cards.shuffle();
+  void shuffle([int? seed]) {
+    final random = seed != null ? Random(seed) : Random();
+    _cards.shuffle(random);
   }
 
   Card? drawCard() {
@@ -29,9 +31,16 @@ class Deck {
 
   int get length => _cards.length;
 
-  void reset() {
+  void reset({int? seed}) {
     _initializeDeck();
-    shuffle();
+    shuffle(seed);
+  }
+
+  void addCards(List<Card> cards) {
+    for (var card in cards) {
+      card.faceUp = false;
+    }
+    _cards.addAll(cards);
   }
 
   // For debugging

@@ -5,12 +5,14 @@ import '../models/foundation_pile.dart';
 
 class GameLogic {
   // Draw card from stock to waste
-  static bool canDrawCard(GameState state) {
+  static bool canDrawCard(GameState state, DrawMode mode) {
     return !state.stock.isEmpty;
   }
 
-  static void drawCard(GameState state) {
-    if (canDrawCard(state)) {
+  static void drawCard(GameState state, DrawMode mode) {
+    if (!canDrawCard(state, mode)) return;
+    int numToDraw = mode == DrawMode.one ? 1 : (state.stock.length < 3 ? state.stock.length : 3);
+    for (int i = 0; i < numToDraw; i++) {
       final card = state.stock.drawCard();
       if (card != null) {
         card.faceUp = true;
@@ -108,8 +110,65 @@ class GameLogic {
     state.tableau[index].flipTopCard();
   }
 
+  // Recycle waste to stock
+  static bool canRecycleWaste(GameState state) {
+    return state.stock.isEmpty && state.waste.isNotEmpty;
+  }
+
+  static void recycleWaste(GameState state) {
+    if (canRecycleWaste(state)) {
+      state.stock.addCards(state.waste);
+      state.waste.clear();
+    }
+  }
+
   // Check if game is won
   static bool isGameWon(GameState state) {
     return state.isWon;
+  }
+
+  // Check if game is stuck (no progress moves possible and not won)
+  static bool isGameStuck(GameState state) {
+    if (isGameWon(state)) return false;
+
+    // Check if can draw from stock
+    if (canDrawCard(state, state.drawMode)) return false;
+
+    // Check waste to tableau moves
+    for (int i = 0; i < 7; i++) {
+      if (canMoveWasteToTableau(state, i)) return false;
+    }
+
+    // Check waste to foundation moves
+    for (int i = 0; i < 4; i++) {
+      if (canMoveWasteToFoundation(state, i)) return false;
+    }
+
+    // Check tableau to tableau moves
+    for (int from = 0; from < 7; from++) {
+      for (int to = 0; to < 7; to++) {
+        if (from == to) continue;
+        int maxCount = state.tableau[from].cards.length;
+        for (int count = 1; count <= maxCount; count++) {
+          if (canMoveTableauToTableau(state, from, to, count)) return false;
+        }
+      }
+    }
+
+    // Check tableau to foundation moves
+    for (int t = 0; t < 7; t++) {
+      for (int f = 0; f < 4; f++) {
+        if (canMoveTableauToFoundation(state, t, f)) return false;
+      }
+    }
+
+    // Check foundation to tableau moves
+    for (int f = 0; f < 4; f++) {
+      for (int t = 0; t < 7; t++) {
+        if (canMoveFoundationToTableau(state, f, t)) return false;
+      }
+    }
+
+    return true; // No moves possible
   }
 }

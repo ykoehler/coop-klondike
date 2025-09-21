@@ -1,7 +1,10 @@
+import 'dart:math';
 import 'card.dart';
 import 'deck.dart';
 import 'tableau_column.dart';
 import 'foundation_pile.dart';
+
+enum DrawMode { one, three }
 
 class GameState {
   List<TableauColumn> tableau = List.generate(7, (_) => TableauColumn());
@@ -13,13 +16,29 @@ class GameState {
   ];
   Deck stock = Deck();
   List<Card> waste = [];
+  late DrawMode drawMode;
+  late String gameId;
 
-  GameState() {
-    _dealNewGame();
+  GameState({DrawMode drawMode = DrawMode.one, String? gameId, int? seed}) {
+    this.drawMode = drawMode;
+    this.gameId = gameId ?? _generateGameId();
+    _dealNewGame(seed: seed ?? this.gameId.hashCode);
   }
 
-  void _dealNewGame() {
-    stock.reset();
+  String _generateGameId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = Random();
+    String part1 = String.fromCharCodes(
+      List.generate(5, (_) => chars.codeUnitAt(random.nextInt(chars.length)))
+    );
+    String part2 = String.fromCharCodes(
+      List.generate(5, (_) => chars.codeUnitAt(random.nextInt(chars.length)))
+    );
+    return '$part1-$part2';
+  }
+
+  void _dealNewGame({int? seed}) {
+    stock.reset(seed: seed);
     waste.clear();
     tableau = List.generate(7, (_) => TableauColumn());
     foundations = [
@@ -44,13 +63,14 @@ class GameState {
   }
 
   void newGame() {
-    _dealNewGame();
+    gameId = _generateGameId();
+    _dealNewGame(seed: gameId.hashCode);
   }
 
   bool get isWon => foundations.every((pile) => pile.isComplete);
 
   @override
   String toString() {
-    return 'GameState(tableau: ${tableau.length}, foundations: ${foundations.length}, stock: ${stock.length}, waste: ${waste.length})';
+    return 'GameState(tableau: ${tableau.length}, foundations: ${foundations.length}, stock: ${stock.length}, waste: ${waste.length}, drawMode: $drawMode, gameId: $gameId)';
   }
 }
