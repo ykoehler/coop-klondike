@@ -14,7 +14,6 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late final GoRouter _router;
   DrawMode _selectedDrawMode = DrawMode.one;
 
   @override
@@ -26,46 +25,30 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _showDrawModeDialog() {
+    print('DEBUG: _showDrawModeDialog called, current _selectedDrawMode: $_selectedDrawMode');
+    final provider = Provider.of<GameProvider>(context, listen: false);
+    final router = GoRouter.of(context);
+    
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Draw Mode'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<DrawMode>(
-              title: const Text('1 Card Draw'),
-              value: DrawMode.one,
-              groupValue: _selectedDrawMode,
-              onChanged: (value) => setState(() => _selectedDrawMode = value!),
-            ),
-            RadioListTile<DrawMode>(
-              title: const Text('3 Card Draw'),
-              subtitle: const Text('3 Card Draw is more challenging'),
-              value: DrawMode.three,
-              groupValue: _selectedDrawMode,
-              onChanged: (value) => setState(() => _selectedDrawMode = value!),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final provider = Provider.of<GameProvider>(context, listen: false);
-              provider.changeDrawMode(_selectedDrawMode);
-              provider.newGame();
-              final newGameId = provider.gameId;
-              _router.go('/game/$newGameId');
-              Navigator.of(context).pop();
-            },
-            child: const Text('Start Game'),
-          ),
-        ],
+      builder: (dialogContext) => _DrawModeDialog(
+        initialDrawMode: _selectedDrawMode,
+        onModeSelected: (selectedMode) {
+          print('DEBUG: Draw mode selected: $selectedMode');
+          print('DEBUG: Provider drawMode before change: ${provider.drawMode}');
+          provider.changeDrawMode(selectedMode);
+          print('DEBUG: Provider drawMode after change: ${provider.drawMode}');
+          provider.newGame();
+          final newGameId = provider.gameId;
+          print('DEBUG: New game ID: $newGameId');
+          router.go('/game/$newGameId');
+          Navigator.of(dialogContext).pop();
+        },
+        onCancel: () {
+          print('DEBUG: Cancel button pressed');
+          Navigator.of(dialogContext).pop();
+        },
       ),
     );
   }
@@ -189,6 +172,74 @@ class _GameScreenState extends State<GameScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _DrawModeDialog extends StatefulWidget {
+  final DrawMode initialDrawMode;
+  final Function(DrawMode) onModeSelected;
+  final VoidCallback onCancel;
+
+  const _DrawModeDialog({
+    required this.initialDrawMode,
+    required this.onModeSelected,
+    required this.onCancel,
+  });
+
+  @override
+  State<_DrawModeDialog> createState() => _DrawModeDialogState();
+}
+
+class _DrawModeDialogState extends State<_DrawModeDialog> {
+  late DrawMode _selectedDrawMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDrawMode = widget.initialDrawMode;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Choose Draw Mode'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RadioListTile<DrawMode>(
+            title: const Text('1 Card Draw'),
+            value: DrawMode.one,
+            groupValue: _selectedDrawMode,
+            onChanged: (value) {
+              print('DEBUG: 1 Card Draw selected, value: $value');
+              setState(() => _selectedDrawMode = value!);
+              print('DEBUG: _selectedDrawMode updated to: $_selectedDrawMode');
+            },
+          ),
+          RadioListTile<DrawMode>(
+            title: const Text('3 Card Draw'),
+            subtitle: const Text('3 Card Draw is more challenging'),
+            value: DrawMode.three,
+            groupValue: _selectedDrawMode,
+            onChanged: (value) {
+              print('DEBUG: 3 Card Draw selected, value: $value');
+              setState(() => _selectedDrawMode = value!);
+              print('DEBUG: _selectedDrawMode updated to: $_selectedDrawMode');
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: widget.onCancel,
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => widget.onModeSelected(_selectedDrawMode),
+          child: const Text('Start Game'),
+        ),
+      ],
     );
   }
 }
