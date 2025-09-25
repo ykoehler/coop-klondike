@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/card.dart' as card_model;
 import '../providers/game_provider.dart';
 import 'card_widget.dart';
 
@@ -44,7 +43,7 @@ class WastePileWidget extends StatelessWidget {
     final provider = Provider.of<GameProvider>(context);
     final waste = provider.gameState.waste;
 
-    return Container(
+    return SizedBox(
       width: 80,
       height: 112,
       child: waste.isNotEmpty

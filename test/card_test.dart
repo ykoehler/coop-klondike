@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/models/card.dart';
+import 'package:coop_klondike/models/card.dart';
 
 void main() {
   group('Card', () {

@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/models/card.dart';
-import '../lib/models/game_state.dart';
-import '../lib/providers/game_provider.dart';
+import 'package:coop_klondike/models/card.dart';
+import 'package:coop_klondike/providers/game_provider.dart';
 
 void main() {
   group('GameProvider', () {

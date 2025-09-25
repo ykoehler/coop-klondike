@@ -26,28 +26,22 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _showDrawModeDialog() {
-    print('DEBUG: _showDrawModeDialog called, current _selectedDrawMode: $_selectedDrawMode');
     final provider = Provider.of<GameProvider>(context, listen: false);
     final router = GoRouter.of(context);
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => _DrawModeDialog(
         initialDrawMode: _selectedDrawMode,
         onModeSelected: (selectedMode) {
-          print('DEBUG: Draw mode selected: $selectedMode');
-          print('DEBUG: Provider drawMode before change: ${provider.drawMode}');
           provider.changeDrawMode(selectedMode);
-          print('DEBUG: Provider drawMode after change: ${provider.drawMode}');
           provider.newGame();
           final newGameId = provider.gameId;
-          print('DEBUG: New game ID: $newGameId');
           router.go('/game/$newGameId');
           Navigator.of(dialogContext).pop();
         },
         onCancel: () {
-          print('DEBUG: Cancel button pressed');
           Navigator.of(dialogContext).pop();
         },
       ),
@@ -63,17 +57,26 @@ class _GameScreenState extends State<GameScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            RadioListTile<DrawMode>(
-              title: const Text('1 Card Draw'),
-              value: DrawMode.one,
-              groupValue: _selectedDrawMode,
-              onChanged: (value) => setState(() => _selectedDrawMode = value!),
-            ),
-            RadioListTile<DrawMode>(
-              title: const Text('3 Card Draw'),
-              value: DrawMode.three,
-              groupValue: _selectedDrawMode,
-              onChanged: (value) => setState(() => _selectedDrawMode = value!),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<DrawMode>(
+                segments: const [
+                  ButtonSegment<DrawMode>(
+                    value: DrawMode.one,
+                    label: Text('1 Card'),
+                  ),
+                  ButtonSegment<DrawMode>(
+                    value: DrawMode.three,
+                    label: Text('3 Cards'),
+                  ),
+                ],
+                selected: {_selectedDrawMode},
+                onSelectionChanged: (selection) {
+                  setState(() {
+                    _selectedDrawMode = selection.first;
+                  });
+                },
+              ),
             ),
             const SizedBox(height: 10),
             const Text(
@@ -106,8 +109,6 @@ class _GameScreenState extends State<GameScreen> {
       const SnackBar(content: Text('Game ID copied to clipboard')),
     );
   }
-
-  @override
 
   @override
   Widget build(BuildContext context) {
@@ -213,26 +214,28 @@ class _DrawModeDialogState extends State<_DrawModeDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RadioListTile<DrawMode>(
-            title: const Text('1 Card Draw'),
-            value: DrawMode.one,
-            groupValue: _selectedDrawMode,
-            onChanged: (value) {
-              print('DEBUG: 1 Card Draw selected, value: $value');
-              setState(() => _selectedDrawMode = value!);
-              print('DEBUG: _selectedDrawMode updated to: $_selectedDrawMode');
+          SegmentedButton<DrawMode>(
+            segments: const [
+              ButtonSegment<DrawMode>(
+                value: DrawMode.one,
+                label: Text('1 Card'),
+              ),
+              ButtonSegment<DrawMode>(
+                value: DrawMode.three,
+                label: Text('3 Cards'),
+              ),
+            ],
+            selected: {_selectedDrawMode},
+            onSelectionChanged: (selection) {
+              setState(() {
+                _selectedDrawMode = selection.first;
+              });
             },
           ),
-          RadioListTile<DrawMode>(
-            title: const Text('3 Card Draw'),
-            subtitle: const Text('3 Card Draw is more challenging'),
-            value: DrawMode.three,
-            groupValue: _selectedDrawMode,
-            onChanged: (value) {
-              print('DEBUG: 3 Card Draw selected, value: $value');
-              setState(() => _selectedDrawMode = value!);
-              print('DEBUG: _selectedDrawMode updated to: $_selectedDrawMode');
-            },
+          const SizedBox(height: 8),
+          const Text(
+            '3 Card Draw is more challenging',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),

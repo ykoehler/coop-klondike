@@ -1,4 +1,3 @@
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
@@ -14,16 +13,6 @@ class GameBoard extends StatefulWidget {
 }
 
 class _GameBoardState extends State<GameBoard> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final element = html.document.querySelector('[data-flutter-key="game-board"]');
-      if (element != null) {
-        element.className = (element.className + ' game-board').trim();
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
