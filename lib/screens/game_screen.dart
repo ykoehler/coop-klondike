@@ -5,6 +5,7 @@ import '../widgets/game_board.dart';
 import '../models/game_state.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
+import '../utils/responsive_utils.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -114,63 +115,68 @@ class _GameScreenState extends State<GameScreen> {
     final isWon = provider.isGameWon;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Klondike Solitaire'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.content_copy),
-            tooltip: 'Copy Game ID',
-            onPressed: _copyGameId,
-          ),
-          Text(
-            'Game: ${provider.gameId}',
-            style: const TextStyle(fontSize: 14),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showSettingsDialog,
-          ),
-          ElevatedButton(
-            onPressed: _showDrawModeDialog,
-            child: const Text('New Game'),
-          ),
-        ],
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(ResponsiveUtils.getAppBarHeight(context)),
+        child: AppBar(
+          title: const Text('Klondike Solitaire'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.content_copy),
+              tooltip: 'Copy Game ID',
+              onPressed: _copyGameId,
+            ),
+            Text(
+              'Game: ${provider.gameId}',
+              style: TextStyle(fontSize: ResponsiveUtils.getAppBarFontSize(context)),
+            ),
+            const SizedBox(width: 10),
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: _showSettingsDialog,
+            ),
+            ElevatedButton(
+              onPressed: _showDrawModeDialog,
+              child: const Text('New Game'),
+            ),
+          ],
+        ),
       ),
-      body: Stack(
-        children: [
-          const GameBoard(),
-          if (isWon)
-            Container(
-              color: Colors.black54,
-              child: Center(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Congratulations!',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            const GameBoard(),
+            if (isWon)
+              Container(
+                color: Colors.black54,
+                child: Center(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Congratulations!',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Text('You won the game!'),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: _showDrawModeDialog,
-                          child: const Text('Play Again'),
-                        ),
-                      ],
+                          const SizedBox(height: 10),
+                          const Text('You won the game!'),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: _showDrawModeDialog,
+                            child: const Text('Play Again'),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
