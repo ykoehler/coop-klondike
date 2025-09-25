@@ -1,0 +1,22 @@
+<svg width="80" height="112" viewBox="0 0 80 112" xmlns="http://www.w3.org/2000/svg">
+  <!-- Card background -->
+  <rect width="80" height="112" rx="6" ry="6" fill="white" stroke="#000" stroke-width="1"/>
+
+  <!-- Card shadow -->
+  <rect x="2" y="2" width="80" height="112" rx="6" ry="6" fill="none" stroke="#000" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- Top left corner (rank and suit) -->
+  <g id="top-left">
+    <!-- This will be filled by individual cards -->
+  </g>
+
+  <!-- Center suit symbol -->
+  <g id="center-suit">
+    <!-- This will be filled by individual cards -->
+  </g>
+
+  <!-- Bottom right corner (suit and rank) -->
+  <g id="bottom-right">
+    <!-- This will be filled by individual cards -->
+  </g>
+</svg>

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/card.dart' as card_model;
 import '../models/tableau_column.dart';
+import '../utils/responsive_utils.dart';
 
 class CardWidget extends StatelessWidget {
   final card_model.Card card;
   final bool draggable;
-  final double width;
-  final double height;
+  final double? width;
+  final double? height;
   final TableauColumn? column;
   final int? cardIndex;
 
@@ -14,30 +16,23 @@ class CardWidget extends StatelessWidget {
     super.key,
     required this.card,
     this.draggable = true,
-    this.width = 80,
-    this.height = 112,
+    this.width,
+    this.height,
     this.column,
     this.cardIndex,
   });
 
   @override
   Widget build(BuildContext context) {
-    Widget cardContent = Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.black, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 4,
-            offset: Offset(2, 2),
-          ),
-        ],
-      ),
-      child: card.faceUp ? _buildFaceUp() : _buildFaceDown(),
+    // Use responsive sizing if width/height not provided
+    final cardWidth = width ?? context.cardWidth;
+    final cardHeight = height ?? context.cardHeight;
+    final tableauSpacing = ResponsiveUtils.getTableauCardSpacing(context);
+    
+    Widget cardContent = SizedBox(
+      width: cardWidth,
+      height: cardHeight,
+      child: card.faceUp ? _buildFaceUp(cardWidth, cardHeight) : _buildFaceDown(cardWidth, cardHeight),
     );
 
     if (draggable && card.faceUp) {
@@ -46,17 +41,17 @@ class CardWidget extends StatelessWidget {
         // Show the sub-stack
         final subStack = column!.cards.sublist(cardIndex!);
         feedbackWidget = SizedBox(
-          width: width,
-          height: height + (subStack.length - 1) * 20.0,
+          width: cardWidth,
+          height: cardHeight + (subStack.length - 1) * tableauSpacing,
           child: Stack(
             children: List.generate(subStack.length, (index) {
               return Positioned(
-                top: index * 20.0,
+                top: index * tableauSpacing,
                 child: CardWidget(
                   card: subStack[index],
                   draggable: false,
-                  width: width,
-                  height: height,
+                  width: cardWidth,
+                  height: cardHeight,
                 ),
               );
             }),
@@ -66,7 +61,7 @@ class CardWidget extends StatelessWidget {
       return Draggable<card_model.Card>(
         data: card,
         feedback: Transform.scale(
-          scale: 1.1,
+          scale: context.dragFeedbackScale,
           child: feedbackWidget,
         ),
         childWhenDragging: Opacity(
@@ -80,98 +75,41 @@ class CardWidget extends StatelessWidget {
     return cardContent;
   }
 
-  Widget _buildFaceDown() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.blue,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Text(
-          '♠',
-          style: TextStyle(
-            fontSize: 24,
-            color: Colors.white,
-          ),
-        ),
-      ),
+  Widget _buildFaceDown(double cardWidth, double cardHeight) {
+    return SvgPicture.asset(
+      'assets/cards/svgs/card_face_down.svg',
+      width: cardWidth,
+      height: cardHeight,
+      fit: BoxFit.contain,
     );
   }
 
-  Widget _buildFaceUp() {
-    final suitColor = card.isRed ? Colors.red : Colors.black;
-    final suitSymbol = _getSuitSymbol(card.suit);
-    final rankText = _getRankText(card.rank);
-
-    return Padding(
-      padding: const EdgeInsets.all(4),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                rankText,
-                style: TextStyle(
-                  color: suitColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                suitSymbol,
-                style: TextStyle(
-                  color: suitColor,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          Center(
-            child: Text(
-              suitSymbol,
-              style: TextStyle(
-                color: suitColor,
-                fontSize: 32,
-              ),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                suitSymbol,
-                style: TextStyle(
-                  color: suitColor,
-                  fontSize: 16,
-                ),
-              ),
-              Text(
-                rankText,
-                style: TextStyle(
-                  color: suitColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+  Widget _buildFaceUp(double cardWidth, double cardHeight) {
+    final assetPath = _getCardAssetPath();
+    return SvgPicture.asset(
+      assetPath,
+      width: cardWidth,
+      height: cardHeight,
+      fit: BoxFit.contain,
     );
   }
 
-  String _getSuitSymbol(card_model.Suit suit) {
+  String _getCardAssetPath() {
+    final suitName = _getSuitName(card.suit);
+    final rankText = _getRankText(card.rank).toLowerCase();
+    return 'assets/cards/svgs/${suitName}_$rankText.svg';
+  }
+
+  String _getSuitName(card_model.Suit suit) {
     switch (suit) {
       case card_model.Suit.hearts:
-        return '♥';
+        return 'hearts';
       case card_model.Suit.diamonds:
-        return '♦';
+        return 'diamonds';
       case card_model.Suit.clubs:
-        return '♣';
+        return 'clubs';
       case card_model.Suit.spades:
-        return '♠';
+        return 'spades';
     }
   }
 

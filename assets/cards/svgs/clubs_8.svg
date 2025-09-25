@@ -1,0 +1,24 @@
+<svg width="80" height="112" viewBox="0 0 80 112" xmlns="http://www.w3.org/2000/svg">
+  <!-- Card background -->
+  <rect width="80" height="112" rx="6" ry="6" fill="white" stroke="#000" stroke-width="1"/>
+
+  <!-- Card shadow -->
+  <rect x="2" y="2" width="80" height="112" rx="6" ry="6" fill="none" stroke="#000" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- Top left corner -->
+  <g fill="black">
+    <text x="8" y="18" font-family="Arial, sans-serif" font-size="14" font-weight="bold">8</text>
+    <text x="8" y="32" font-family="Arial, sans-serif" font-size="14">♣</text>
+  </g>
+
+  <!-- Center suit symbol -->
+  <g fill="black">
+    <text x="40" y="56" text-anchor="middle" font-family="Arial, sans-serif" font-size="24">♣</text>
+  </g>
+
+  <!-- Bottom right corner -->
+  <g fill="black">
+    <text x="72" y="104" text-anchor="end" font-family="Arial, sans-serif" font-size="14">♣</text>
+    <text x="72" y="90" text-anchor="end" font-family="Arial, sans-serif" font-size="14" font-weight="bold">8</text>
+  </g>
+</svg>
