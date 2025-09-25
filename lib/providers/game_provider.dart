@@ -4,7 +4,7 @@ import '../logic/game_logic.dart';
 
 class GameProvider extends ChangeNotifier {
   GameState _gameState;
-  DrawMode _currentDrawMode = DrawMode.one;
+  DrawMode _currentDrawMode = DrawMode.three;
 
   GameState get gameState => _gameState;
   String get gameId => _gameState.gameId;

@@ -19,7 +19,7 @@ class GameState {
   late DrawMode drawMode;
   late String gameId;
 
-  GameState({this.drawMode = DrawMode.one, String? gameId, int? seed})
+  GameState({this.drawMode = DrawMode.three, String? gameId, int? seed})
       : gameId = gameId ?? _generateGameId() {
     _dealNewGame(seed: seed ?? this.gameId.hashCode);
   }
