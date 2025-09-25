@@ -15,7 +15,7 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
-  DrawMode _selectedDrawMode = DrawMode.one;
+  DrawMode _selectedDrawMode = DrawMode.three;
 
   @override
   void initState() {

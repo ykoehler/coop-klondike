@@ -14,6 +14,7 @@ Project initialization and memory bank setup. The Coop Klondike Flutter web appl
 - Added URL parameter support for seed-based game initialization
 - Created E2E test that validates full game flow including win/stuck detection
 - Added test-friendly identifiers (CSS classes and data attributes) to Flutter widgets for reliable Playwright E2E testing
+- Implemented responsive layout for mobile devices: on narrow screens (mobile), stock/waste piles are moved below tableau columns in a centered horizontal row to maximize horizontal space for the 7 tableau columns
 - Changed default draw mode from 1-card to 3-card draw
 
 ## Next Steps
