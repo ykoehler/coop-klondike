@@ -1,4 +1,3 @@
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
@@ -21,22 +20,12 @@ class FoundationPileWidget extends StatefulWidget {
 }
 
 class _FoundationPileWidgetState extends State<FoundationPileWidget> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final element = html.document.querySelector('[data-flutter-key="foundation-${widget.pileIndex}"]');
-      if (element != null) {
-        element.className = (element.className + ' foundation-${widget.pileIndex}').trim();
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<card_model.Card>(
-      onWillAccept: (card) => _canAcceptCard(card),
-      onAccept: (card) => _onAcceptCard(context, card),
+      onWillAcceptWithDetails: (details) => _canAcceptCard(details.data),
+      onAcceptWithDetails: (details) => _onAcceptCard(context, details.data),
       builder: (context, candidateData, rejectedData) {
         return Container(
           key: Key('foundation-${widget.pileIndex}'),

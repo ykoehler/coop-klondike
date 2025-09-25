@@ -1,9 +1,11 @@
 # Current Context: Coop Klondike
 
 ## Current Work Focus
+
 Project initialization and memory bank setup. The Coop Klondike Flutter web application appears to be in a complete, functional state with all core features implemented.
 
 ## Recent Changes
+
 - Memory bank initialization (first-time setup)
 - Added clickable empty stock area for waste recycling functionality in StockPileWidget
 - Implemented game stuck detection logic with `isGameStuck` method in GameLogic and corresponding getter in GameProvider
@@ -12,14 +14,18 @@ Project initialization and memory bank setup. The Coop Klondike Flutter web appl
 - Added URL parameter support for seed-based game initialization
 - Created E2E test that validates full game flow including win/stuck detection
 - Added test-friendly identifiers (CSS classes and data attributes) to Flutter widgets for reliable Playwright E2E testing
+- Implemented responsive layout for mobile devices: on narrow screens (mobile), stock/waste piles are moved below tableau columns in a centered horizontal row to maximize horizontal space for the 7 tableau columns
+- Changed default draw mode from 1-card to 3-card draw
 
 ## Next Steps
+
 - Verify memory bank accuracy with user
 - Consider deployment preparation
 - Evaluate potential feature enhancements (undo functionality, scoring, themes)
 - Assess testing coverage completeness
 
 ## Project Status
+
 - **Codebase**: Complete and well-structured
 - **Features**: All core Klondike solitaire rules implemented
 - **Testing**: Comprehensive unit test coverage + E2E testing setup

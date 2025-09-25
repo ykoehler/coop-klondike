@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/models/card.dart';
-import '../lib/models/tableau_column.dart';
+import 'package:coop_klondike/models/card.dart';
+import 'package:coop_klondike/models/tableau_column.dart';
 
 void main() {
   group('TableauColumn', () {

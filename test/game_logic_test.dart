@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/models/card.dart';
-import '../lib/models/game_state.dart';
-import '../lib/logic/game_logic.dart';
+import 'package:coop_klondike/models/card.dart';
+import 'package:coop_klondike/models/game_state.dart';
+import 'package:coop_klondike/logic/game_logic.dart';
 
 void main() {
   group('GameLogic', () {

@@ -19,13 +19,12 @@ class GameState {
   late DrawMode drawMode;
   late String gameId;
 
-  GameState({DrawMode drawMode = DrawMode.one, String? gameId, int? seed}) {
-    this.drawMode = drawMode;
-    this.gameId = gameId ?? _generateGameId();
+  GameState({this.drawMode = DrawMode.three, String? gameId, int? seed})
+      : gameId = gameId ?? _generateGameId() {
     _dealNewGame(seed: seed ?? this.gameId.hashCode);
   }
 
-  String _generateGameId() {
+  static String _generateGameId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();
     String part1 = String.fromCharCodes(

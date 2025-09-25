@@ -18,8 +18,8 @@ class TableauColumnWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DragTarget<card_model.Card>(
-      onWillAccept: (card) => _canAcceptCard(card),
-      onAccept: (card) => _onAcceptCard(context, card),
+      onWillAcceptWithDetails: (details) => _canAcceptCard(details.data),
+      onAcceptWithDetails: (details) => _onAcceptCard(context, details.data),
       builder: (context, candidateData, rejectedData) {
         return Container(
           width: 80,

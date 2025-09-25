@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/models/card.dart';
-import '../lib/models/game_state.dart';
-import '../lib/models/foundation_pile.dart';
+import 'package:coop_klondike/models/card.dart';
+import 'package:coop_klondike/models/game_state.dart';
 
 void main() {
   group('GameState', () {
@@ -131,14 +130,14 @@ void main() {
   });
 
   group('DrawMode in GameState', () {
-    test('default drawMode is one', () {
+    test('default drawMode is three', () {
       final state = GameState();
-      expect(state.drawMode, DrawMode.one);
+      expect(state.drawMode, DrawMode.three);
     });
 
-    test('drawMode can be set to three', () {
-      final state = GameState(drawMode: DrawMode.three);
-      expect(state.drawMode, DrawMode.three);
+    test('drawMode can be set to one', () {
+      final state = GameState(drawMode: DrawMode.one);
+      expect(state.drawMode, DrawMode.one);
     });
   });
 }
