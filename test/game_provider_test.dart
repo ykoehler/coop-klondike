@@ -1,6 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart' hide Card;
 import 'package:coop_klondike/models/card.dart';
 import 'package:coop_klondike/providers/game_provider.dart';
+
+class _MockBuildContext extends Fake implements BuildContext {
+  final bool _mounted = true;
+  
+  @override
+  bool get mounted => _mounted;
+}
 
 void main() {
   group('GameProvider', () {

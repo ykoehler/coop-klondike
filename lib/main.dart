@@ -3,9 +3,18 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'providers/game_provider.dart';
 import 'screens/game_screen.dart';
+import 'screens/error_screen.dart';
 import 'models/game_state.dart';
+import 'firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  FirebaseDatabase.instance.databaseURL = 'https://coop-klondike-default-rtdb.firebaseio.com';
   runApp(const KlondikeApp());
 }
 
@@ -25,24 +34,41 @@ class KlondikeApp extends StatelessWidget {
   }
 
   static final GoRouter _router = GoRouter(
+    initialLocation: '/',
+    debugLogDiagnostics: true,
     routes: [
       GoRoute(
         path: '/game/:id',
         builder: (context, state) {
           final gameId = state.pathParameters['id']!;
-          final seedParam = state.uri.queryParameters['seed'];
-          final seed = seedParam != null ? int.tryParse(seedParam) : null;
+          if (!RegExp(r'^[A-Z0-9]{5}-[A-Z0-9]{5}$').hasMatch(gameId)) {
+            return const ErrorScreen(message: 'Invalid game ID format');
+          }
           return ChangeNotifierProvider(
-            create: (context) => GameProvider(gameId: gameId, seed: seed),
+            create: (context) => GameProvider(gameId: gameId),
             child: const GameScreen(),
           );
         },
       ),
       GoRoute(
         path: '/',
-        redirect: (context, state) {
-          final gameId = GameState().gameId;
-          return '/game/$gameId';
+        builder: (context, state) {
+          // Create a new game state when hitting the root
+          final gameState = GameState();
+          return ChangeNotifierProvider(
+            create: (context) => GameProvider(gameId: gameState.gameId),
+            child: Builder(
+              builder: (context) {
+                // Redirect to the game URL after provider is ready
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (context.mounted) {
+                    context.go('/game/${gameState.gameId}');
+                  }
+                });
+                return const GameScreen();
+              },
+            ),
+          );
         },
       ),
     ],

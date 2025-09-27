@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
 import '../models/tableau_column.dart';
 import '../utils/responsive_utils.dart';
+import '../providers/game_provider.dart';
 
-class CardWidget extends StatelessWidget {
+class CardWidget extends StatefulWidget {
   final card_model.Card card;
   final bool draggable;
   final double? width;
@@ -23,23 +25,58 @@ class CardWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Use responsive sizing if width/height not provided
-    final cardWidth = width ?? context.cardWidth;
-    final cardHeight = height ?? context.cardHeight;
-    final tableauSpacing = ResponsiveUtils.getTableauCardSpacing(context);
-    
-    Widget cardContent = SizedBox(
-      width: cardWidth,
-      height: cardHeight,
-      child: card.faceUp ? _buildFaceUp(cardWidth, cardHeight) : _buildFaceDown(cardWidth, cardHeight),
-    );
+  State<CardWidget> createState() => _CardWidgetState();
+}
 
-    if (draggable && card.faceUp) {
+class _CardWidgetState extends State<CardWidget> {
+
+  @override
+  Widget build(BuildContext context) {
+    late final GameProvider provider;
+    try {
+      provider = Provider.of<GameProvider>(context);
+    } catch (e) {
+      // If provider is not available, return basic card widget
+      return _buildCardContent(context, context.cardWidth, context.cardHeight, ResponsiveUtils.getTableauCardSpacing(context));
+    }
+
+    final dragState = provider.currentDrag;
+    final cardId = '${widget.card.suit}_${widget.card.rank}';
+    
+    // Use responsive sizing if width/height not provided
+    final cardWidth = widget.width ?? context.cardWidth;
+    final cardHeight = widget.height ?? context.cardHeight;
+    final tableauSpacing = ResponsiveUtils.getTableauCardSpacing(context);
+
+    // Check if this card is being dragged by another player - use visual indicator instead of Positioned
+    bool isBeingDraggedByOther = dragState != null &&
+        dragState.cardId == cardId &&
+        dragState.playerId != provider.playerId;
+    
+    Widget cardContent = _buildCardContent(context, cardWidth, cardHeight, tableauSpacing);
+
+    // Add visual indication if being dragged by another player
+    if (isBeingDraggedByOther) {
+      cardContent = Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.blue, width: 3),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Opacity(
+          opacity: 0.7,
+          child: cardContent,
+        ),
+      );
+    }
+
+    // Add debug info
+    print('Card ${widget.card}: draggable=${widget.draggable}, faceUp=${widget.card.faceUp}, isLocked=${provider.isLocked}');
+    
+    if (widget.draggable && widget.card.faceUp && !provider.isLocked) {
       Widget feedbackWidget = cardContent;
-      if (column != null && cardIndex != null) {
+      if (widget.column != null && widget.cardIndex != null) {
         // Show the sub-stack
-        final subStack = column!.cards.sublist(cardIndex!);
+        final subStack = widget.column!.cards.sublist(widget.cardIndex!);
         feedbackWidget = SizedBox(
           width: cardWidth,
           height: cardHeight + (subStack.length - 1) * tableauSpacing,
@@ -58,8 +95,9 @@ class CardWidget extends StatelessWidget {
           ),
         );
       }
+
       return Draggable<card_model.Card>(
-        data: card,
+        data: widget.card,
         feedback: Transform.scale(
           scale: context.dragFeedbackScale,
           child: feedbackWidget,
@@ -69,10 +107,41 @@ class CardWidget extends StatelessWidget {
           child: cardContent,
         ),
         child: cardContent,
+        onDragStarted: () async {
+          // Capture RenderBox before async operation to avoid context issues
+          final RenderBox? box = context.findRenderObject() as RenderBox?;
+          if (box == null) {
+            print('Warning: RenderBox not available for drag start');
+            return;
+          }
+
+          if (await provider.acquireLock('drag')) {
+            // Start broadcasting drag position
+            final position = box.localToGlobal(Offset.zero);
+            provider.updateDragPosition(cardId, position.dx, position.dy);
+          }
+        },
+        onDragEnd: (_) async {
+          // Stop broadcasting drag position
+          await provider.releaseLock();
+          provider.updateDragPosition(cardId, 0, 0); // Reset position
+        },
+        onDragUpdate: (details) {
+          // Update drag position
+          provider.updateDragPosition(cardId, details.globalPosition.dx, details.globalPosition.dy);
+        },
       );
     }
 
     return cardContent;
+  }
+
+  Widget _buildCardContent(BuildContext context, double cardWidth, double cardHeight, double tableauSpacing) {
+    return SizedBox(
+      width: cardWidth,
+      height: cardHeight,
+      child: widget.card.faceUp ? _buildFaceUp(cardWidth, cardHeight) : _buildFaceDown(cardWidth, cardHeight),
+    );
   }
 
   Widget _buildFaceDown(double cardWidth, double cardHeight) {
@@ -95,8 +164,8 @@ class CardWidget extends StatelessWidget {
   }
 
   String _getCardAssetPath() {
-    final suitName = _getSuitName(card.suit);
-    final rankText = _getRankText(card.rank).toLowerCase();
+    final suitName = _getSuitName(widget.card.suit);
+    final rankText = _getRankText(widget.card.rank).toLowerCase();
     return 'assets/cards/svgs/${suitName}_$rankText.svg';
   }
 

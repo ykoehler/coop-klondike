@@ -87,7 +87,7 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
 
     // Check tableau
     for (int i = 0; i < gameState.tableau.length; i++) {
-      if (gameState.tableau[i].topCard == card) {
+      if (gameState.tableau[i].cards.isNotEmpty && gameState.tableau[i].topCard == card) {
         provider.moveTableauToFoundation(i, widget.pileIndex);
         return;
       }

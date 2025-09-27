@@ -49,13 +49,13 @@ class ResponsiveUtils {
     switch (sizeCategory) {
       case ResponsiveSize.mobile:
         // Mobile: smaller cards to fit more content
-        return width * 0.12; // 12% of screen width
+        return (width - 32) / 8; // Divide available width by 8 (7 columns + 1 for padding)
       case ResponsiveSize.tablet:
         // Tablet: medium cards
-        return width * 0.08; // 8% of screen width
+        return (width - 48) / 9; // Divide available width by 9 for more spacing
       case ResponsiveSize.desktop:
         // Desktop: larger cards for better visibility
-        return width * 0.06; // 6% of screen width
+        return (width - 64) / 10; // Divide available width by 10 for even more spacing
     }
   }
 

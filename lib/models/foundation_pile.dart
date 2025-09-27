@@ -4,6 +4,27 @@ class FoundationPile {
   final Suit suit;
   List<Card> cards = [];
 
+  Map<String, dynamic> toJson() => {
+    'suit': suit.toString(),
+    'cards': cards.map((card) => card.toJson()).toList(),
+  };
+
+  static FoundationPile fromJson(Map<String, dynamic> json) {
+    final pile = FoundationPile(
+      suit: Suit.values.firstWhere(
+        (s) => s.toString() == json['suit'],
+        orElse: () => Suit.hearts,  // Default to hearts if suit is invalid
+      ),
+    );
+    final cardsList = json['cards'] as List?;
+    if (cardsList != null) {
+      pile.cards = cardsList
+          .map((card) => Card.fromJson(card as Map<String, dynamic>))
+          .toList();
+    }
+    return pile;
+  }
+
   FoundationPile({required this.suit});
 
   bool canAcceptCard(Card card) {
