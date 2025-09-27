@@ -21,6 +21,18 @@ class Card {
   final Rank rank;
   bool faceUp;
 
+  Map<String, dynamic> toJson() => {
+    'suit': suit.toString(),
+    'rank': rank.toString(),
+    'faceUp': faceUp,
+  };
+
+  static Card fromJson(Map<String, dynamic> json) => Card(
+    suit: Suit.values.firstWhere((s) => s.toString() == json['suit']),
+    rank: Rank.values.firstWhere((r) => r.toString() == json['rank']),
+    faceUp: json['faceUp'] as bool,
+  );
+
   Card({
     required this.suit,
     required this.rank,

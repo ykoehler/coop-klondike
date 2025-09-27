@@ -38,7 +38,7 @@ class _GameBoardState extends State<GameBoard> {
           children: List.generate(
             gameState.foundations.length,
             (index) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: EdgeInsets.symmetric(horizontal: context.foundationSpacing),
               child: FoundationPileWidget(
                 pile: gameState.foundations[index],
                 pileIndex: index,
@@ -46,7 +46,7 @@ class _GameBoardState extends State<GameBoard> {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: context.elementSpacing),
         // Tableau and Stock/Waste
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,25 +55,39 @@ class _GameBoardState extends State<GameBoard> {
             Column(
               children: [
                 StockPileWidget(),
-                const SizedBox(height: 8),
+                SizedBox(height: context.elementSpacing / 2),
                 WastePileWidget(),
               ],
             ),
-            const SizedBox(width: 20),
+            SizedBox(width: context.elementSpacing),
             // Tableau columns
             Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  gameState.tableau.length,
-                  (index) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: TableauColumnWidget(
-                      column: gameState.tableau[index],
-                      columnIndex: index,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Calculate maximum card width based on available space
+                  final maxWidth = (constraints.maxWidth - (gameState.tableau.length - 1) * context.elementSpacing) / gameState.tableau.length;
+                  final cardWidth = maxWidth.clamp(0.0, context.cardWidth);
+
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        gameState.tableau.length,
+                        (index) => Padding(
+                          padding: EdgeInsets.symmetric(horizontal: context.elementSpacing / 2),
+                          child: SizedBox(
+                            width: cardWidth,
+                            child: TableauColumnWidget(
+                              column: gameState.tableau[index],
+                              columnIndex: index,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],

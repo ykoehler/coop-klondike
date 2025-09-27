@@ -4,6 +4,23 @@ import 'card.dart';
 class Deck {
   List<Card> _cards = [];
 
+  Map<String, dynamic> toJson() => {
+    'cards': _cards.map((card) => card.toJson()).toList(),
+  };
+
+  static Deck fromJson(Map<String, dynamic> json) {
+    final deck = Deck();
+    final cardsList = json['cards'] as List?;
+    if (cardsList != null) {
+      deck._cards = cardsList
+          .map((card) => Card.fromJson(card as Map<String, dynamic>))
+          .toList();
+    } else {
+      deck._initializeDeck();
+    }
+    return deck;
+  }
+
   Deck() {
     _initializeDeck();
   }

@@ -21,29 +21,57 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showDrawModeDialog();
+      _checkForDialogDisplay();
     });
+  }
+
+  void _checkForDialogDisplay() {
+    final provider = Provider.of<GameProvider>(context, listen: false);
+    
+    // If still initializing, wait for completion
+    if (provider.isInitializing) {
+      // Schedule another check after initialization might be complete
+      Future.delayed(Duration(milliseconds: 100), () {
+        if (mounted) {
+          _checkForDialogDisplay();
+        }
+      });
+      return;
+    }
+    
+    // Only show dialog if this is a new game (not existing in Firebase)
+    if (!provider.gameState.existsInFirebase) {
+      _showDrawModeDialog();
+    }
   }
 
   void _showDrawModeDialog() {
     final provider = Provider.of<GameProvider>(context, listen: false);
-    final router = GoRouter.of(context);
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => _DrawModeDialog(
-        initialDrawMode: _selectedDrawMode,
-        onModeSelected: (selectedMode) {
-          provider.changeDrawMode(selectedMode);
-          provider.newGame();
-          final newGameId = provider.gameId;
-          router.go('/game/$newGameId');
-          Navigator.of(dialogContext).pop();
-        },
-        onCancel: () {
-          Navigator.of(dialogContext).pop();
-        },
+      builder: (dialogContext) => WillPopScope(
+        onWillPop: () async => false,  // Prevent dialog from being dismissed with back button
+        child: _DrawModeDialog(
+          initialDrawMode: _selectedDrawMode,
+          onModeSelected: (selectedMode) async {
+            try {
+              provider.changeDrawMode(selectedMode);
+              await provider.setupInitialGameState();
+              if (dialogContext.mounted) {
+                Navigator.of(dialogContext).pop();
+              }
+            } catch (e) {
+              print('Error starting game: $e');
+            }
+          },
+          onCancel: () {
+            if (dialogContext.mounted) {
+              Navigator.of(dialogContext).pop();
+            }
+          },
+        ),
       ),
     );
   }
@@ -200,6 +228,7 @@ class _DrawModeDialog extends StatefulWidget {
 
 class _DrawModeDialogState extends State<_DrawModeDialog> {
   late DrawMode _selectedDrawMode;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -207,48 +236,83 @@ class _DrawModeDialogState extends State<_DrawModeDialog> {
     _selectedDrawMode = widget.initialDrawMode;
   }
 
+  void _handleModeChange(Set<DrawMode> selection) {
+    if (!_isProcessing) {
+      setState(() {
+        _selectedDrawMode = selection.first;
+      });
+    }
+  }
+
+  Future<void> _handleStartGame() async {
+    if (_isProcessing) return;
+    
+    setState(() => _isProcessing = true);
+    try {
+      await widget.onModeSelected(_selectedDrawMode);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting game: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Choose Draw Mode'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SegmentedButton<DrawMode>(
-            segments: const [
-              ButtonSegment<DrawMode>(
-                value: DrawMode.one,
-                label: Text('1 Card'),
+    return WillPopScope(
+      onWillPop: () async => false,
+      child: AlertDialog(
+        title: const Text('Choose Draw Mode'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<DrawMode>(
+                segments: const [
+                  ButtonSegment<DrawMode>(
+                    value: DrawMode.one,
+                    label: Text('1 Card'),
+                  ),
+                  ButtonSegment<DrawMode>(
+                    value: DrawMode.three,
+                    label: Text('3 Cards'),
+                  ),
+                ],
+                selected: {_selectedDrawMode},
+                onSelectionChanged: _handleModeChange,
               ),
-              ButtonSegment<DrawMode>(
-                value: DrawMode.three,
-                label: Text('3 Cards'),
-              ),
-            ],
-            selected: {_selectedDrawMode},
-            onSelectionChanged: (selection) {
-              setState(() {
-                _selectedDrawMode = selection.first;
-              });
-            },
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '3 Card Draw is more challenging',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isProcessing ? null : widget.onCancel,
+            child: const Text('Cancel'),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            '3 Card Draw is more challenging',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ElevatedButton(
+            onPressed: _isProcessing ? null : _handleStartGame,
+            child: _isProcessing
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Start Game'),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: widget.onCancel,
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () => widget.onModeSelected(_selectedDrawMode),
-          child: const Text('Start Game'),
-        ),
-      ],
     );
   }
 }
