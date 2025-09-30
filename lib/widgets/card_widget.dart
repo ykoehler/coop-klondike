@@ -141,6 +141,7 @@ class _CardWidgetState extends State<CardWidget> {
   }
 
   Widget _buildCardContent(BuildContext context, double cardWidth, double cardHeight, double tableauSpacing) {
+    print('DEBUG: CardWidget _buildCardContent - card: ${widget.card}, faceUp: ${widget.card.faceUp}, dimensions: ${cardWidth}x${cardHeight}');
     return Container(
       width: cardWidth,
       height: cardHeight,
