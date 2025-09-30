@@ -175,5 +175,95 @@ void main() {
       expect(drawnCard!.suit, cards[1].suit); // Last added card
       expect(drawnCard.rank, cards[1].rank);
     });
+
+    test('deck creates exactly 52 unique cards', () {
+      final deck = Deck();
+
+      // Collect all cards
+      final allCards = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        final card = deck.drawCard();
+        expect(card, isNotNull, reason: 'Card $i should not be null');
+        allCards.add(card!);
+      }
+
+      // Verify we have exactly 52 cards
+      expect(allCards.length, 52);
+
+      // Check for uniqueness by comparing each card to every other card
+      for (int i = 0; i < allCards.length; i++) {
+        for (int j = i + 1; j < allCards.length; j++) {
+          expect(allCards[i], isNot(equals(allCards[j])),
+              reason: 'Cards at positions $i and $j should be different: ${allCards[i]} vs ${allCards[j]}');
+        }
+      }
+
+      // Verify all suits are present
+      final suits = allCards.map((card) => card.suit).toSet();
+      expect(suits.length, 4, reason: 'Should have all 4 suits');
+
+      // Verify all ranks are present
+      final ranks = allCards.map((card) => card.rank).toSet();
+      expect(ranks.length, 13, reason: 'Should have all 13 ranks');
+
+      // Verify each suit has exactly 13 cards
+      for (final suit in Suit.values) {
+        final suitCards = allCards.where((card) => card.suit == suit).length;
+        expect(suitCards, 13, reason: 'Suit $suit should have exactly 13 cards');
+      }
+
+      // Verify each rank appears exactly 4 times (once per suit)
+      for (final rank in Rank.values) {
+        final rankCards = allCards.where((card) => card.rank == rank).length;
+        expect(rankCards, 4, reason: 'Rank $rank should appear exactly 4 times');
+      }
+    });
+
+    test('Firebase serialization preserves card uniqueness', () {
+      final deck = Deck();
+
+      // Draw all cards to get them in a list
+      final originalCards = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        final card = deck.drawCard();
+        expect(card, isNotNull);
+        originalCards.add(card!);
+      }
+
+      // Simulate Firebase serialization/deserialization cycle
+      final json = {
+        'cards': originalCards.map((card) => card.toJson()).toList(),
+      };
+
+      final deckFromJson = Deck.fromJson(json);
+
+      // Verify the deserialized deck has the same number of cards
+      expect(deckFromJson.length, 52);
+
+      // Collect all cards from deserialized deck
+      final deserializedCards = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        final card = deckFromJson.drawCard();
+        expect(card, isNotNull);
+        deserializedCards.add(card!);
+      }
+
+      // Verify uniqueness in deserialized cards
+      for (int i = 0; i < deserializedCards.length; i++) {
+        for (int j = i + 1; j < deserializedCards.length; j++) {
+          expect(deserializedCards[i], isNot(equals(deserializedCards[j])),
+              reason: 'Deserialized cards at positions $i and $j should be different');
+        }
+      }
+
+      // Verify the deserialized cards contain the same unique combinations as original
+      final originalSet = originalCards.map((c) => '${c.suit}-${c.rank}').toSet();
+      final deserializedSet = deserializedCards.map((c) => '${c.suit}-${c.rank}').toSet();
+
+      expect(deserializedSet.length, originalSet.length,
+          reason: 'Deserialized cards should have same number of unique combinations');
+      expect(deserializedSet, equals(originalSet),
+          reason: 'Deserialized cards should contain exactly the same unique combinations');
+    });
   });
 }

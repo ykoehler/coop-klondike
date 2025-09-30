@@ -116,15 +116,19 @@ class _CardWidgetState extends State<CardWidget> {
           }
 
           if (await provider.acquireLock('drag')) {
+            // Mark as dragging to prevent state updates during drag
+            provider.setDragging(true);
             // Start broadcasting drag position
             final position = box.localToGlobal(Offset.zero);
             provider.updateDragPosition(cardId, position.dx, position.dy);
           }
         },
-        onDragEnd: (_) async {
+        onDragEnd: (details) async {
           // Stop broadcasting drag position
-          await provider.releaseLock();
           provider.updateDragPosition(cardId, 0, 0); // Reset position
+          await provider.releaseLock();
+          // Mark drag as complete - this will apply any pending updates
+          provider.setDragging(false);
         },
         onDragUpdate: (details) {
           // Update drag position

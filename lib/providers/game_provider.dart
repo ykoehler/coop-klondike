@@ -29,12 +29,18 @@ class GameProvider extends ChangeNotifier {
   DragState? get currentDrag => _currentDrag;
   bool get isInitializing => _isInitializing;
 
-  GameProvider({String? gameId, int? seed}) 
-    : _gameState = GameState(gameId: gameId, seed: seed),
-      _playerId = _generatePlayerId() {
-    _gameState.drawMode = _currentDrawMode;
+  GameProvider({String? gameId, int? seed})
+    : _providedGameId = gameId,
+      _providedSeed = seed,
+      _playerId = _generatePlayerId(),
+      _gameState = GameState(gameId: gameId, seed: 0) { // Temporary placeholder
     _initializeGame();
   }
+
+  final String? _providedGameId;
+  final int? _providedSeed;
+  bool _isDragging = false;
+  GameState? _pendingStateUpdate;
 
   static String _generatePlayerId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -44,32 +50,63 @@ class GameProvider extends ChangeNotifier {
     );
   }
 
+  static String _generateGameId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = Random();
+    String part1 = String.fromCharCodes(
+      List.generate(5, (_) => chars.codeUnitAt(random.nextInt(chars.length)))
+    );
+    String part2 = String.fromCharCodes(
+      List.generate(5, (_) => chars.codeUnitAt(random.nextInt(chars.length)))
+    );
+    return '$part1-$part2';
+  }
+
   Future<void> _initializeGame() async {
-    print('Initializing game with ID: $gameId');
+    final actualGameId = _providedGameId ?? _generateGameId();
+    print('Initializing game with ID: $actualGameId');
     
     // Use atomic game creation to prevent race conditions
     bool gameCreated = false;
     try {
-      print('Attempting to create new game atomically for ID: $gameId');
-      gameCreated = await _firebaseService.createGameIfNotExists(gameId, _gameState);
+      // First, try to load existing game
+      print('Checking if game exists for ID: $actualGameId');
+      final existingGame = await _firebaseService.getGame(actualGameId);
       
-      if (gameCreated) {
-        print('Successfully created new game in Firebase');
-        _gameState.existsInFirebase = true;
-      } else {
+      if (existingGame != null) {
         print('Game already exists, loading existing state');
-        final existingGame = await _firebaseService.getGame(gameId);
-        if (existingGame != null) {
-          _gameState = existingGame;
-          print('Loaded existing game state');
+        _gameState = existingGame;
+        _gameState.existsInFirebase = true;
+        print('Loaded existing game state with ${_gameState.stock.length} cards in stock');
+      } else {
+        print('Game does not exist, creating new game atomically');
+        // Create a fresh game state with dealt cards ONLY if Firebase doesn't have it
+        final newGameState = GameState(
+          gameId: actualGameId,
+          seed: _providedSeed ?? actualGameId.hashCode,
+          drawMode: _currentDrawMode
+        );
+        
+        // Try atomic creation
+        gameCreated = await _firebaseService.createGameIfNotExists(actualGameId, newGameState);
+        
+        if (gameCreated) {
+          print('Successfully created new game in Firebase');
+          _gameState = newGameState;
+          _gameState.existsInFirebase = true;
         } else {
-          print('Warning: Game creation failed and existing game not found');
-          // Fallback: wait and try again
-          await Future.delayed(Duration(milliseconds: 500));
-          final retryGame = await _firebaseService.getGame(gameId);
+          print('Race condition: Another player created the game, loading their state');
+          // Another player created it in the meantime, load their version
+          await Future.delayed(Duration(milliseconds: 300));
+          final retryGame = await _firebaseService.getGame(actualGameId);
           if (retryGame != null) {
             _gameState = retryGame;
+            _gameState.existsInFirebase = true;
             print('Loaded game state on retry');
+          } else {
+            print('ERROR: Could not load game after race condition');
+            // Use our local state as fallback
+            _gameState = newGameState;
           }
         }
       }
@@ -89,6 +126,7 @@ class GameProvider extends ChangeNotifier {
       print('=== FIREBASE GAME STATE UPDATE RECEIVED ===');
       print('Player ID: $_playerId');
       print('Game ID: $gameId');
+      print('Is Dragging: $_isDragging');
       print('New State GameId: ${newState.gameId}');
       print('Tableau columns count: ${newState.tableau.length}');
       
@@ -100,6 +138,14 @@ class GameProvider extends ChangeNotifier {
           final card = column.cards[j];
           print('  Card $j: ${card.suit} ${card.rank} (faceUp: ${card.faceUp})');
         }
+      }
+      
+      // If we're currently dragging, queue the update instead of applying it immediately
+      // This prevents card loss during drag operations
+      if (_isDragging) {
+        print('Dragging in progress, queueing state update');
+        _pendingStateUpdate = newState;
+        return;
       }
       
       print('Current local state before update:');
@@ -242,9 +288,16 @@ class GameProvider extends ChangeNotifier {
     if (!GameLogic.canMoveWasteToTableau(_gameState, tableauIndex)) return;
 
     if (await acquireLock('moveWasteToTableau')) {
+      _isDragging = false;
       GameLogic.moveWasteToTableau(_gameState, tableauIndex);
       await _updateGameState();
       await releaseLock();
+      
+      if (_pendingStateUpdate != null) {
+        _gameState = _pendingStateUpdate!;
+        _pendingStateUpdate = null;
+      }
+      
       notifyListeners();
     }
   }
@@ -253,9 +306,16 @@ class GameProvider extends ChangeNotifier {
     if (!GameLogic.canMoveWasteToFoundation(_gameState, foundationIndex)) return;
 
     if (await acquireLock('moveWasteToFoundation')) {
+      _isDragging = false;
       GameLogic.moveWasteToFoundation(_gameState, foundationIndex);
       await _updateGameState();
       await releaseLock();
+      
+      if (_pendingStateUpdate != null) {
+        _gameState = _pendingStateUpdate!;
+        _pendingStateUpdate = null;
+      }
+      
       notifyListeners();
     }
   }
@@ -264,9 +324,28 @@ class GameProvider extends ChangeNotifier {
     if (!GameLogic.canMoveTableauToTableau(_gameState, fromIndex, toIndex, cardCount)) return;
 
     if (await acquireLock('moveTableauToTableau')) {
+      _isDragging = false; // Drag completed successfully
       GameLogic.moveTableauToTableau(_gameState, fromIndex, toIndex, cardCount);
       await _updateGameState();
       await releaseLock();
+      
+      // Apply any pending state updates that arrived during drag
+      if (_pendingStateUpdate != null) {
+        print('Applying pending state update after drag completion');
+        _gameState = _pendingStateUpdate!;
+        _pendingStateUpdate = null;
+      }
+      
+      notifyListeners();
+    }
+  }
+  
+  void setDragging(bool dragging) {
+    _isDragging = dragging;
+    if (!dragging && _pendingStateUpdate != null) {
+      print('Drag cancelled, applying pending state update');
+      _gameState = _pendingStateUpdate!;
+      _pendingStateUpdate = null;
       notifyListeners();
     }
   }
@@ -275,9 +354,16 @@ class GameProvider extends ChangeNotifier {
     if (!GameLogic.canMoveTableauToFoundation(_gameState, tableauIndex, foundationIndex)) return;
 
     if (await acquireLock('moveTableauToFoundation')) {
+      _isDragging = false;
       GameLogic.moveTableauToFoundation(_gameState, tableauIndex, foundationIndex);
       await _updateGameState();
       await releaseLock();
+      
+      if (_pendingStateUpdate != null) {
+        _gameState = _pendingStateUpdate!;
+        _pendingStateUpdate = null;
+      }
+      
       notifyListeners();
     }
   }
@@ -286,9 +372,16 @@ class GameProvider extends ChangeNotifier {
     if (!GameLogic.canMoveFoundationToTableau(_gameState, foundationIndex, tableauIndex)) return;
 
     if (await acquireLock('moveFoundationToTableau')) {
+      _isDragging = false;
       GameLogic.moveFoundationToTableau(_gameState, foundationIndex, tableauIndex);
       await _updateGameState();
       await releaseLock();
+      
+      if (_pendingStateUpdate != null) {
+        _gameState = _pendingStateUpdate!;
+        _pendingStateUpdate = null;
+      }
+      
       notifyListeners();
     }
   }
