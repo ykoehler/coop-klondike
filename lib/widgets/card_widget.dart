@@ -145,21 +145,42 @@ class _CardWidgetState extends State<CardWidget> {
   }
 
   Widget _buildFaceDown(double cardWidth, double cardHeight) {
-    return SvgPicture.asset(
-      'assets/cards/svgs/card_face_down.svg',
-      width: cardWidth,
-      height: cardHeight,
-      fit: BoxFit.contain,
-    );
-  }
-
-  Widget _buildFaceUp(double cardWidth, double cardHeight) {
-    final assetPath = _getCardAssetPath();
+    final assetPath = 'assets/cards/svgs/card_face_down.svg';
+    print('DEBUG: Loading face down card from: $assetPath');
     return SvgPicture.asset(
       assetPath,
       width: cardWidth,
       height: cardHeight,
       fit: BoxFit.contain,
+      placeholderBuilder: (context) {
+        print('DEBUG: Face down card placeholder triggered');
+        return Container(
+          width: cardWidth,
+          height: cardHeight,
+          color: Colors.blue,
+          child: const Text('SVG Loading...', style: TextStyle(color: Colors.white)),
+        );
+      },
+    );
+  }
+
+  Widget _buildFaceUp(double cardWidth, double cardHeight) {
+    final assetPath = _getCardAssetPath();
+    print('DEBUG: Loading face up card from: $assetPath');
+    return SvgPicture.asset(
+      assetPath,
+      width: cardWidth,
+      height: cardHeight,
+      fit: BoxFit.contain,
+      placeholderBuilder: (context) {
+        print('DEBUG: Face up card placeholder triggered for: $assetPath');
+        return Container(
+          width: cardWidth,
+          height: cardHeight,
+          color: Colors.red,
+          child: Text('SVG Loading...\n$assetPath', style: TextStyle(color: Colors.white, fontSize: 10)),
+        );
+      },
     );
   }
 
