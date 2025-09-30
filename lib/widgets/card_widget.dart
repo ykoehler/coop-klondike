@@ -137,9 +137,25 @@ class _CardWidgetState extends State<CardWidget> {
   }
 
   Widget _buildCardContent(BuildContext context, double cardWidth, double cardHeight, double tableauSpacing) {
-    return SizedBox(
+    print('DEBUG: CardWidget _buildCardContent - card: ${widget.card}, faceUp: ${widget.card.faceUp}, dimensions: ${cardWidth}x${cardHeight}');
+    return Container(
       width: cardWidth,
       height: cardHeight,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Colors.black.withOpacity(0.3),
+          width: 1.0,
+        ),
+        borderRadius: BorderRadius.circular(8.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(2, 2),
+          ),
+        ],
+      ),
       child: widget.card.faceUp ? _buildFaceUp(cardWidth, cardHeight) : _buildFaceDown(cardWidth, cardHeight),
     );
   }
@@ -167,20 +183,46 @@ class _CardWidgetState extends State<CardWidget> {
   Widget _buildFaceUp(double cardWidth, double cardHeight) {
     final assetPath = _getCardAssetPath();
     print('DEBUG: Loading face up card from: $assetPath');
-    return SvgPicture.asset(
-      assetPath,
+    print('DEBUG: Card suit=${widget.card.suit}, rank=${widget.card.rank}');
+    
+    return Container(
       width: cardWidth,
       height: cardHeight,
-      fit: BoxFit.contain,
-      placeholderBuilder: (context) {
-        print('DEBUG: Face up card placeholder triggered for: $assetPath');
-        return Container(
-          width: cardWidth,
-          height: cardHeight,
-          color: Colors.red,
-          child: Text('SVG Loading...\n$assetPath', style: TextStyle(color: Colors.white, fontSize: 10)),
-        );
-      },
+      alignment: Alignment.center,
+      child: SvgPicture.asset(
+        assetPath,
+        width: cardWidth,
+        height: cardHeight,
+        fit: BoxFit.fill,
+        placeholderBuilder: (context) {
+          print('DEBUG: Face up card placeholder triggered for: $assetPath');
+          return Container(
+            width: cardWidth,
+            height: cardHeight,
+            color: Colors.red,
+            child: Text('SVG Loading...\n$assetPath', style: TextStyle(color: Colors.white, fontSize: 10)),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          print('ERROR: SVG failed to load for: $assetPath');
+          print('ERROR details: $error');
+          if (stackTrace != null) {
+            print('ERROR stackTrace: $stackTrace');
+          }
+          return Container(
+            width: cardWidth,
+            height: cardHeight,
+            color: Colors.orange,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('SVG Error', style: TextStyle(color: Colors.white, fontSize: 12)),
+                Text(widget.card.toString(), style: TextStyle(color: Colors.white, fontSize: 10)),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

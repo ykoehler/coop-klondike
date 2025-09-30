@@ -49,6 +49,8 @@ class WastePileWidget extends StatelessWidget {
     final cardWidth = context.cardWidth;
     final cardHeight = context.cardHeight;
 
+    print('DEBUG: WastePileWidget build - waste has ${waste.length} cards, dimensions: ${cardWidth}x${cardHeight}');
+
     return SizedBox(
       width: cardWidth,
       height: cardHeight,

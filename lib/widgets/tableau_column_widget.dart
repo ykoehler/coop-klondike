@@ -48,6 +48,7 @@ class TableauColumnWidget extends StatelessWidget {
   }
 
   List<Widget> _buildCardStack(BuildContext context, double cardWidth, double cardHeight, double cardSpacing) {
+    print('DEBUG: TableauColumnWidget _buildCardStack - column has ${column.cards.length} cards, dimensions: ${cardWidth}x${cardHeight}, spacing: $cardSpacing');
     List<Widget> widgets = [];
     double currentTop = 0.0;
 
@@ -56,6 +57,8 @@ class TableauColumnWidget extends StatelessWidget {
 
       // Use half spacing for face-down cards, normal spacing for face-up cards
       final effectiveSpacing = card.faceUp ? cardSpacing : cardSpacing * 0.5;
+
+      print('DEBUG: TableauColumnWidget card $i - ${card}, faceUp: ${card.faceUp}, position: $currentTop, effectiveSpacing: $effectiveSpacing');
 
       widgets.add(
         Positioned(
