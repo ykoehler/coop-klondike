@@ -117,6 +117,7 @@ class _GameBoardState extends State<GameBoard> {
         // Tableau columns
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: List.generate(
             gameState.tableau.length,
             (index) => Padding(

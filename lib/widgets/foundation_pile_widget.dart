@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
 import '../models/foundation_pile.dart';
 import '../providers/game_provider.dart';
+import '../utils/responsive_utils.dart';
 import 'card_widget.dart';
 
 class FoundationPileWidget extends StatefulWidget {
@@ -23,14 +24,17 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final cardWidth = context.cardWidth;
+    final cardHeight = context.cardHeight;
+    
     return DragTarget<card_model.Card>(
       onWillAcceptWithDetails: (details) => _canAcceptCard(details.data),
       onAcceptWithDetails: (details) => _onAcceptCard(context, details.data),
       builder: (context, candidateData, rejectedData) {
         return Container(
           key: Key('foundation-${widget.pileIndex}'),
-          width: 80,
-          height: 112,
+          width: cardWidth,
+          height: cardHeight,
           decoration: BoxDecoration(
             border: candidateData.isNotEmpty
                 ? Border.all(color: Colors.green, width: 2)
@@ -38,18 +42,23 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: widget.pile.isEmpty
-              ? _buildEmptyPlaceholder()
-              : CardWidget(card: widget.pile.topCard!, draggable: false),
+              ? _buildEmptyPlaceholder(context, cardWidth, cardHeight)
+              : CardWidget(
+                  card: widget.pile.topCard!,
+                  draggable: false,
+                  width: cardWidth,
+                  height: cardHeight,
+                ),
         );
       },
     );
   }
 
-  Widget _buildEmptyPlaceholder() {
+  Widget _buildEmptyPlaceholder(BuildContext context, double cardWidth, double cardHeight) {
     return Center(
       child: Container(
-        width: 60,
-        height: 90,
+        width: cardWidth * 0.75,
+        height: cardHeight * 0.80,
         decoration: BoxDecoration(
           color: Colors.grey[300],
           borderRadius: BorderRadius.circular(4),
@@ -59,7 +68,7 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
             widget.pile.suit.name[0].toUpperCase(),
             style: TextStyle(
               color: Colors.grey[600],
-              fontSize: 24,
+              fontSize: context.cardFontSize * 1.5,
               fontWeight: FontWeight.bold,
             ),
           ),
