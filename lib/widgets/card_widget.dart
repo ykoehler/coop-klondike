@@ -181,14 +181,10 @@ class _CardWidgetState extends State<CardWidget> {
       width: cardWidth,
       height: cardHeight,
       fit: BoxFit.contain,
+      // No placeholder needed since SVGs are precached
       placeholderBuilder: (context) {
-        debugPrint('⏳ Placeholder showing for face-down card: ${widget.card}');
-        return Container(
-          width: cardWidth,
-          height: cardHeight,
-          color: Colors.blue,
-          child: const Text('SVG Loading...', style: TextStyle(color: Colors.white, fontSize: 8)),
-        );
+        // Return invisible placeholder - SVGs should be cached already
+        return const SizedBox.shrink();
       },
       errorBuilder: (context, error, stackTrace) {
         debugPrint('❌ ERROR loading card_face_down.svg for ${widget.card}: $error');
@@ -230,13 +226,10 @@ class _CardWidgetState extends State<CardWidget> {
         width: cardWidth,
         height: cardHeight,
         fit: BoxFit.fill,
+        // No placeholder needed since SVGs are precached
         placeholderBuilder: (context) {
-          return Container(
-            width: cardWidth,
-            height: cardHeight,
-            color: Colors.red,
-            child: Text('SVG Loading...\n$assetPath', style: TextStyle(color: Colors.white, fontSize: 10)),
-          );
+          // Return invisible placeholder - SVGs should be cached already
+          return const SizedBox.shrink();
         },
         errorBuilder: (context, error, stackTrace) {
           return Container(

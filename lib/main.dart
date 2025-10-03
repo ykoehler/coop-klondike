@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'models/game_state.dart';
 import 'services/firebase_service.dart';
+import 'utils/svg_cache.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,11 +21,60 @@ void main() async {
   runApp(const KlondikeApp());
 }
 
-class KlondikeApp extends StatelessWidget {
+class KlondikeApp extends StatefulWidget {
   const KlondikeApp({super.key});
 
   @override
+  State<KlondikeApp> createState() => _KlondikeAppState();
+}
+
+class _KlondikeAppState extends State<KlondikeApp> {
+  bool _svgsCached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_svgsCached) {
+      _precacheSvgs();
+    }
+  }
+
+  Future<void> _precacheSvgs() async {
+    await SvgCache.precacheCardSvgs(context);
+    if (mounted) {
+      setState(() {
+        _svgsCached = true;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!_svgsCached) {
+      return MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.green[700],
+          body: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: Colors.white),
+                SizedBox(height: 20),
+                Text(
+                  'Loading Klondike Solitaire...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return MaterialApp.router(
       routerConfig: _router,
       title: 'Klondike Solitaire',
