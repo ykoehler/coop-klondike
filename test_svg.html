@@ -63,7 +63,7 @@
     <div class="test-section">
         <h2>1. Direct SVG File Reference (img tag)</h2>
         <div class="card-container">
-            <img id="img-test" src="assets/cards/svgs/card_face_down.svg" 
+            <img id="img-test" src="assets/assets/cards/svgs/card_face_down.svg" 
                  width="120" height="168" 
                  alt="Card Face Down"
                  onload="logSuccess('img-test', 'Image loaded successfully')"
@@ -82,7 +82,7 @@
     <div class="test-section">
         <h2>3. SVG via Object Tag</h2>
         <div class="card-container">
-            <object id="object-test" data="assets/cards/svgs/card_face_down.svg" 
+            <object id="object-test" data="assets/assets/cards/svgs/card_face_down.svg" 
                     type="image/svg+xml" width="120" height="168">
                 SVG not supported
             </object>
@@ -100,13 +100,13 @@
     <div class="test-section">
         <h2>5. Test Sample Face-Up Cards</h2>
         <div class="card-container">
-            <img src="assets/cards/svgs/hearts_a.svg" width="120" height="168" alt="Ace of Hearts"
+            <img src="assets/assets/cards/svgs/hearts_a.svg" width="120" height="168" alt="Ace of Hearts"
                  onload="logSuccess('hearts-a', 'Hearts Ace loaded')"
                  onerror="logError('hearts-a', 'Hearts Ace failed')">
             <p id="hearts-a-status">Hearts A</p>
         </div>
         <div class="card-container">
-            <img src="assets/cards/svgs/spades_k.svg" width="120" height="168" alt="King of Spades"
+            <img src="assets/assets/cards/svgs/spades_k.svg" width="120" height="168" alt="King of Spades"
                  onload="logSuccess('spades-k', 'Spades King loaded')"
                  onerror="logError('spades-k', 'Spades King failed')">
             <p id="spades-k-status">Spades K</p>
@@ -148,7 +148,7 @@
         }
 
         // Test 2: Load SVG inline
-        fetch('assets/cards/svgs/card_face_down.svg')
+        fetch('assets/assets/cards/svgs/card_face_down.svg')
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -165,7 +165,7 @@
             });
 
         // Test 4: Fetch and parse like Flutter might
-        fetch('assets/cards/svgs/card_face_down.svg')
+        fetch('assets/assets/cards/svgs/card_face_down.svg')
             .then(response => response.text())
             .then(svgText => {
                 const container = document.getElementById('fetch-svg-container');

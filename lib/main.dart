@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/game_provider.dart';
 import 'screens/game_screen.dart';
 import 'screens/error_screen.dart';
+import 'screens/svg_debug_screen.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -30,6 +31,8 @@ class KlondikeApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
+        // Use system fonts instead of trying to load Roboto from Google Fonts
+        fontFamily: null,
       ),
     );
   }
@@ -38,6 +41,10 @@ class KlondikeApp extends StatelessWidget {
     initialLocation: '/',
     debugLogDiagnostics: true,
     routes: [
+      GoRoute(
+        path: '/debug-svg',
+        builder: (context, state) => const SvgDebugScreen(),
+      ),
       GoRoute(
         path: '/game/:id',
         builder: (context, state) {

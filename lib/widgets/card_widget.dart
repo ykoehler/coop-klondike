@@ -175,12 +175,14 @@ class _CardWidgetState extends State<CardWidget> {
 
   Widget _buildFaceDown(double cardWidth, double cardHeight) {
     final assetPath = 'assets/cards/svgs/card_face_down.svg';
+    debugPrint('🎴 Rendering face-down card: ${widget.card}');
     return SvgPicture.asset(
       assetPath,
       width: cardWidth,
       height: cardHeight,
       fit: BoxFit.contain,
       placeholderBuilder: (context) {
+        debugPrint('⏳ Placeholder showing for face-down card: ${widget.card}');
         return Container(
           width: cardWidth,
           height: cardHeight,
@@ -189,7 +191,7 @@ class _CardWidgetState extends State<CardWidget> {
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        debugPrint('❌ ERROR loading card_face_down.svg: $error');
+        debugPrint('❌ ERROR loading card_face_down.svg for ${widget.card}: $error');
         debugPrint('Stack trace: $stackTrace');
         return Container(
           width: cardWidth,

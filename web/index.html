@@ -31,8 +31,25 @@
 
   <title>coop_klondike</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Prevent Flutter from trying to load Roboto font from Google Fonts */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    
+    /* Loading indicator */
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: sans-serif;
+    }
+  </style>
 </head>
 <body>
+  <div class="loading">Loading...</div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -542,9 +542,11 @@ class GameProvider extends ChangeNotifier {
     );
   }
 
-  Future<String?> newGame() async {
+  Future<String?> newGame({String? seed, DrawMode? drawMode}) async {
     if (await acquireLock('newGame')) {
-      _gameState = GameState(drawMode: _currentDrawMode);
+      final mode = drawMode ?? _currentDrawMode;
+      _gameState = GameState(drawMode: mode, seedStr: seed);
+      _currentDrawMode = mode;
       await _updateGameState();
       await releaseLock();
       if (_mounted) {
