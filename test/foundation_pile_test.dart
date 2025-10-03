@@ -4,48 +4,51 @@ import 'package:coop_klondike/models/foundation_pile.dart';
 
 void main() {
   group('FoundationPile', () {
-    test('empty pile accepts aces of matching suit', () {
-      final heartsPile = FoundationPile(suit: Suit.hearts);
-      final ace = Card(suit: Suit.hearts, rank: Rank.ace);
-      expect(heartsPile.canAcceptCard(ace), true);
+    test('empty pile accepts any ace and locks suit after first card', () {
+      final pile = FoundationPile();
+      final heartsAce = Card(suit: Suit.hearts, rank: Rank.ace);
+      final spadesAce = Card(suit: Suit.spades, rank: Rank.ace);
 
-      final spadeAce = Card(suit: Suit.spades, rank: Rank.ace);
-      expect(heartsPile.canAcceptCard(spadeAce), false);
+      expect(pile.canAcceptCard(heartsAce), true);
+      expect(pile.canAcceptCard(spadesAce), true);
 
-      final two = Card(suit: Suit.hearts, rank: Rank.two);
-      expect(heartsPile.canAcceptCard(two), false);
+      pile.addCard(spadesAce);
+      expect(pile.suit, Suit.spades);
+
+      final heartsTwo = Card(suit: Suit.hearts, rank: Rank.two);
+      expect(pile.canAcceptCard(heartsTwo), false);
     });
 
     test('accepts ascending cards of same suit', () {
-      final heartsPile = FoundationPile(suit: Suit.hearts);
+      final pile = FoundationPile();
       final ace = Card(suit: Suit.hearts, rank: Rank.ace);
-      heartsPile.addCard(ace);
+      pile.addCard(ace);
 
       final two = Card(suit: Suit.hearts, rank: Rank.two);
-      expect(heartsPile.canAcceptCard(two), true);
+      expect(pile.canAcceptCard(two), true);
 
-      heartsPile.addCard(two);
+      pile.addCard(two);
       final three = Card(suit: Suit.hearts, rank: Rank.three);
-      expect(heartsPile.canAcceptCard(three), true);
+      expect(pile.canAcceptCard(three), true);
     });
 
     test('rejects wrong suit or non-ascending', () {
-      final heartsPile = FoundationPile(suit: Suit.hearts);
+      final pile = FoundationPile();
       final ace = Card(suit: Suit.hearts, rank: Rank.ace);
-      heartsPile.addCard(ace);
+      pile.addCard(ace);
 
       final spadeTwo = Card(suit: Suit.spades, rank: Rank.two);
-      expect(heartsPile.canAcceptCard(spadeTwo), false);
+      expect(pile.canAcceptCard(spadeTwo), false);
 
       final heartsThree = Card(suit: Suit.hearts, rank: Rank.three);
-      expect(heartsPile.canAcceptCard(heartsThree), false); // Skipping two
+      expect(pile.canAcceptCard(heartsThree), false); // Skipping two
 
       final heartsAce = Card(suit: Suit.hearts, rank: Rank.ace);
-      expect(heartsPile.canAcceptCard(heartsAce), false); // Descending
+      expect(pile.canAcceptCard(heartsAce), false); // Descending
     });
 
     test('addCard and topCard', () {
-      final pile = FoundationPile(suit: Suit.hearts);
+      final pile = FoundationPile();
       expect(pile.isEmpty, true);
       expect(pile.topCard, null);
 
@@ -56,7 +59,7 @@ void main() {
     });
 
     test('isComplete when 13 cards', () {
-      final pile = FoundationPile(suit: Suit.hearts);
+      final pile = FoundationPile();
       expect(pile.isComplete, false);
 
       for (int i = 0; i < 13; i++) {
@@ -65,6 +68,27 @@ void main() {
         pile.addCard(card);
       }
       expect(pile.isComplete, true);
+    });
+
+    test('suit remains locked even when cards are removed', () {
+      final pile = FoundationPile();
+      final ace = Card(suit: Suit.diamonds, rank: Rank.ace);
+      final two = Card(suit: Suit.diamonds, rank: Rank.two);
+
+      pile.addCard(ace);
+      pile.addCard(two);
+      expect(pile.suit, Suit.diamonds);
+
+      pile.cards.removeLast();
+      pile.cards.removeLast();
+      expect(pile.cards, isEmpty);
+      expect(pile.suit, Suit.diamonds);
+
+      final spadeAce = Card(suit: Suit.spades, rank: Rank.ace);
+      expect(pile.canAcceptCard(spadeAce), false);
+
+      final diamondAce = Card(suit: Suit.diamonds, rank: Rank.ace);
+      expect(pile.canAcceptCard(diamondAce), true);
     });
   });
 }

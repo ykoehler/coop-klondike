@@ -24,22 +24,23 @@ void main() {
         expect(pile.isEmpty, true);
       }
 
-      // Check stock has remaining cards: 52 - (1+2+3+4+5+6+7) = 52 - 28 = 24
-      expect(state.stock.length, 24);
-      expect(state.waste.isEmpty, true);
+      // Check stock has remaining cards: 52 - (1+2+3+4+5+6+7) - 3 (auto-drawn in DrawMode.three) = 52 - 28 - 3 = 21
+      expect(state.stock.length, 21);
+      // Three cards automatically drawn to waste in DrawMode.three
+      expect(state.waste.length, 3);
     });
 
     test('newGame resets the game', () {
       final state = GameState();
-      // Modify state
+      // Modify state by adding more waste cards
       state.waste.add(state.stock.drawCard()!);
 
       state.newGame();
 
-      // Should be back to initial state
+      // Should be back to initial state with three cards in waste (DrawMode.three)
       expect(state.tableau.length, 7);
-      expect(state.stock.length, 24);
-      expect(state.waste.isEmpty, true);
+      expect(state.stock.length, 21);
+      expect(state.waste.length, 3);
     });
 
     test('isWon returns false initially', () {
@@ -51,16 +52,76 @@ void main() {
       final state = GameState();
 
       // Fill each foundation with 13 cards
-      for (final pile in state.foundations) {
-        for (int i = 0; i < 13; i++) {
-          final rank = Rank.values[i];
-          final card = Card(suit: pile.suit, rank: rank);
+      final suits = Suit.values;
+      for (int foundationIndex = 0; foundationIndex < state.foundations.length; foundationIndex++) {
+        final pile = state.foundations[foundationIndex];
+        final suit = suits[foundationIndex % suits.length];
+        for (int rankIndex = 0; rankIndex < 13; rankIndex++) {
+          final rank = Rank.values[rankIndex];
+          final card = Card(suit: suit, rank: rank);
           pile.addCard(card);
         }
         expect(pile.isComplete, true);
+        expect(pile.suit, suit);
       }
 
       expect(state.isWon, true);
+    });
+
+    test('deserialization pads missing foundations from list input', () {
+      final ace = Card(suit: Suit.hearts, rank: Rank.ace, faceUp: true);
+      final json = {
+        'tableau': List.generate(7, (_) => {'cards': []}),
+        'foundations': [
+          {
+            'suit': ace.suit.toString(),
+            'cards': [ace.toJson()],
+          },
+        ],
+        'stock': {'cards': []},
+        'waste': [],
+        'drawMode': 'DrawMode.three',
+        'gameId': 'TEST-LIST',
+        'seed': 'seed-list',
+      };
+
+      final state = GameState.fromJson(json);
+
+      expect(state.foundations.length, 4);
+      expect(state.foundations[0].topCard, isNotNull);
+      expect(state.foundations[0].topCard!.rank, Rank.ace);
+      expect(state.foundations[0].topCard!.suit, Suit.hearts);
+      for (int i = 1; i < 4; i++) {
+        expect(state.foundations[i].cards, isEmpty);
+      }
+    });
+
+    test('deserialization pads missing foundations from sparse map input', () {
+      final ace = Card(suit: Suit.spades, rank: Rank.ace, faceUp: true);
+      final json = {
+        'tableau': List.generate(7, (_) => {'cards': []}),
+        'foundations': {
+          '2': {
+            'suit': ace.suit.toString(),
+            'cards': [ace.toJson()],
+          },
+        },
+        'stock': {'cards': []},
+        'waste': [],
+        'drawMode': 'DrawMode.three',
+        'gameId': 'TEST-MAP',
+        'seed': 'seed-map',
+      };
+
+      final state = GameState.fromJson(json);
+
+      expect(state.foundations.length, 4);
+      expect(state.foundations[2].topCard, isNotNull);
+      expect(state.foundations[2].topCard!.rank, Rank.ace);
+      expect(state.foundations[2].topCard!.suit, Suit.spades);
+      expect(state.foundations[0].cards, isEmpty);
+      expect(state.foundations[1].cards, isEmpty);
+      expect(state.foundations[3].cards, isEmpty);
     });
   });
 
@@ -138,6 +199,43 @@ void main() {
     test('drawMode can be set to one', () {
       final state = GameState(drawMode: DrawMode.one);
       expect(state.drawMode, DrawMode.one);
+    });
+  });
+
+  group('GameState Seed Serialization', () {
+    test('serialization preserves seed', () {
+      final state = GameState(seedStr: 'test');
+      expect(state.seed, 'test');
+
+      final json = state.toJson();
+      expect(json['seed'], 'test');
+
+      final newState = GameState.fromJson(json);
+      expect(newState.seed, 'test');
+    });
+
+    test('default seed is generated', () {
+      final state = GameState();
+      expect(state.seed.isNotEmpty, true);
+    });
+
+    test('empty seed uses default', () {
+      final state = GameState(seedStr: '');
+      expect(state.seed.isNotEmpty, true);
+    });
+
+    test('deserialization handles missing seed field', () {
+      final json = {
+        'tableau': [],
+        'foundations': [],
+        'stock': [],
+        'waste': [],
+        'drawMode': 'three'
+      }; // no seed field
+
+      final state = GameState.fromJson(json);
+      expect(state.seed, isNotNull);
+      expect(state.seed.isNotEmpty, true);
     });
   });
 }

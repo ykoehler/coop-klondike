@@ -15,7 +15,7 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: 'line',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -65,8 +65,9 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'flutter run --web-port=8080 --web-hostname=127.0.0.1 --release',
+    command: 'npx http-server ../build/web -p 8080 -c-1',
     url: 'http://127.0.0.1:8080',
     reuseExistingServer: !process.env.CI,
+    cwd: __dirname,
   },
 });

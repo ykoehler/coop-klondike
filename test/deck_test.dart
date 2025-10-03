@@ -85,8 +85,8 @@ void main() {
       final deck1 = Deck();
       final deck2 = Deck();
 
-      deck1.shuffle(42);
-      deck2.shuffle(42);
+      deck1.shuffle('42');
+      deck2.shuffle('42');
 
       // Compare first 10 cards
       final cards1 = <Card>[];
@@ -106,8 +106,8 @@ void main() {
       final deck1 = Deck();
       final deck2 = Deck();
 
-      deck1.shuffle(42);
-      deck2.shuffle(43);
+      deck1.shuffle('42');
+      deck2.shuffle('43');
 
       // Compare first 10 cards
       final cards1 = <Card>[];
@@ -132,8 +132,8 @@ void main() {
       final deck1 = Deck();
       final deck2 = Deck();
 
-      deck1.reset(seed: 123);
-      deck2.reset(seed: 123);
+      deck1.reset(seed: '123');
+      deck2.reset(seed: '123');
 
       // Compare all cards
       for (int i = 0; i < 52; i++) {
@@ -264,6 +264,62 @@ void main() {
           reason: 'Deserialized cards should have same number of unique combinations');
       expect(deserializedSet, equals(originalSet),
           reason: 'Deserialized cards should contain exactly the same unique combinations');
+    });
+  });
+
+  group('Deck Seed Functionality', () {
+    test('seeded shuffle determinism', () {
+      final deck1 = Deck();
+      deck1.shuffle('test');
+      final cards1 = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        cards1.add(deck1.drawCard()!);
+      }
+
+      final deck2 = Deck();
+      deck2.shuffle('test');
+      final cards2 = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        cards2.add(deck2.drawCard()!);
+      }
+
+      expect(cards1, cards2);
+    });
+
+    test('different seeds differ', () {
+      final deck1 = Deck();
+      deck1.shuffle('test1');
+      final cards1 = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        cards1.add(deck1.drawCard()!);
+      }
+
+      final deck2 = Deck();
+      deck2.shuffle('test2');
+      final cards2 = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        cards2.add(deck2.drawCard()!);
+      }
+
+      expect(cards1, isNot(equals(cards2)));
+    });
+
+    test('shuffle without seed produces different results', () {
+      final deck1 = Deck();
+      deck1.shuffle();
+      final cards1 = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        cards1.add(deck1.drawCard()!);
+      }
+
+      final deck2 = Deck();
+      deck2.shuffle();
+      final cards2 = <Card>[];
+      for (int i = 0; i < 52; i++) {
+        cards2.add(deck2.drawCard()!);
+      }
+
+      expect(cards1, isNot(equals(cards2))); // Highly unlikely to be the same
     });
   });
 }

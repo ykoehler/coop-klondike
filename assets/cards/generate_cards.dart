@@ -20,19 +20,16 @@ void main() {
       final svgContent = _generateCardSVG(suitSymbol, rank, suitColor);
 
       File('assets/cards/svgs/$filename').writeAsStringSync(svgContent);
-      print('Generated: $filename');
     }
   }
 
   // Generate card back
   final cardBackContent = _generateCardBackSVG();
   File('assets/cards/svgs/card_back.svg').writeAsStringSync(cardBackContent);
-  print('Generated: card_back.svg');
 
   // Generate face down card
   final faceDownContent = _generateFaceDownSVG();
   File('assets/cards/svgs/card_face_down.svg').writeAsStringSync(faceDownContent);
-  print('Generated: card_face_down.svg');
 }
 
 String _getRankText(int rankIndex) {

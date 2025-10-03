@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
 import '../widgets/game_board.dart';
 import '../models/game_state.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import '../utils/responsive_utils.dart';
+import '../utils/test_hooks.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -16,6 +16,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   DrawMode _selectedDrawMode = DrawMode.three;
+  bool _hooksRegistered = false;
 
   @override
   void initState() {
@@ -23,6 +24,16 @@ class _GameScreenState extends State<GameScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForDialogDisplay();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hooksRegistered) {
+      final provider = Provider.of<GameProvider>(context, listen: false);
+      registerTestHooks(provider);
+      _hooksRegistered = true;
+    }
   }
 
   void _checkForDialogDisplay() {

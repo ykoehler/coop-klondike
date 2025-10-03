@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
@@ -40,15 +42,24 @@ class TableauColumnWidget extends StatelessWidget {
                 : null,
           ),
           child: Stack(
-            children: _buildCardStack(context, cardWidth, cardHeight, cardSpacing),
+            children: _buildCardStack(
+              context,
+              cardWidth,
+              cardHeight,
+              cardSpacing,
+            ),
           ),
         );
       },
     );
   }
 
-  List<Widget> _buildCardStack(BuildContext context, double cardWidth, double cardHeight, double cardSpacing) {
-    print('DEBUG: TableauColumnWidget _buildCardStack - column has ${column.cards.length} cards, dimensions: ${cardWidth}x${cardHeight}, spacing: $cardSpacing');
+  List<Widget> _buildCardStack(
+    BuildContext context,
+    double cardWidth,
+    double cardHeight,
+    double cardSpacing,
+  ) {
     List<Widget> widgets = [];
     double currentTop = 0.0;
 
@@ -57,8 +68,6 @@ class TableauColumnWidget extends StatelessWidget {
 
       // Use half spacing for face-down cards, normal spacing for face-up cards
       final effectiveSpacing = card.faceUp ? cardSpacing : cardSpacing * 0.5;
-
-      print('DEBUG: TableauColumnWidget card $i - ${card}, faceUp: ${card.faceUp}, position: $currentTop, effectiveSpacing: $effectiveSpacing');
 
       widgets.add(
         Positioned(
@@ -93,14 +102,14 @@ class TableauColumnWidget extends StatelessWidget {
 
     // Check waste
     if (gameState.waste.isNotEmpty && gameState.waste.last == card) {
-      provider.moveWasteToTableau(columnIndex);
+      unawaited(provider.moveWasteToTableau(columnIndex));
       return;
     }
 
     // Check foundations
     for (int i = 0; i < gameState.foundations.length; i++) {
       if (gameState.foundations[i].topCard == card) {
-        provider.moveFoundationToTableau(i, columnIndex);
+        unawaited(provider.moveFoundationToTableau(i, columnIndex));
         return;
       }
     }
@@ -112,7 +121,7 @@ class TableauColumnWidget extends StatelessWidget {
         final cardIndex = fromColumn.cards.indexOf(card);
         if (cardIndex != -1 && card.faceUp) {
           final cardCount = fromColumn.cards.length - cardIndex;
-          provider.moveTableauToTableau(i, columnIndex, cardCount);
+          unawaited(provider.moveTableauToTableau(i, columnIndex, cardCount));
           return;
         }
       }

@@ -29,6 +29,7 @@ class CardWidget extends StatefulWidget {
 }
 
 class _CardWidgetState extends State<CardWidget> {
+  bool _hasDragLock = false;
 
   @override
   Widget build(BuildContext context) {
@@ -70,9 +71,8 @@ class _CardWidgetState extends State<CardWidget> {
     }
 
     // Add debug info
-    print('Card ${widget.card}: draggable=${widget.draggable}, faceUp=${widget.card.faceUp}, isLocked=${provider.isLocked}');
     
-    if (widget.draggable && widget.card.faceUp && !provider.isLocked) {
+    if (widget.draggable && widget.card.faceUp && !provider.isLocked && !provider.hasPendingAction) {
       Widget feedbackWidget = cardContent;
       if (widget.column != null && widget.cardIndex != null) {
         // Show the sub-stack
@@ -111,12 +111,16 @@ class _CardWidgetState extends State<CardWidget> {
           // Capture RenderBox before async operation to avoid context issues
           final RenderBox? box = context.findRenderObject() as RenderBox?;
           if (box == null) {
-            print('Warning: RenderBox not available for drag start');
+            return;
+          }
+
+          if (provider.hasPendingAction) {
             return;
           }
 
           if (await provider.acquireLock('drag')) {
             // Mark as dragging to prevent state updates during drag
+            _hasDragLock = true;
             provider.setDragging(true);
             // Start broadcasting drag position
             final position = box.localToGlobal(Offset.zero);
@@ -125,14 +129,19 @@ class _CardWidgetState extends State<CardWidget> {
         },
         onDragEnd: (details) async {
           // Stop broadcasting drag position
-          provider.updateDragPosition(cardId, 0, 0); // Reset position
-          await provider.releaseLock();
+          if (_hasDragLock) {
+            provider.updateDragPosition(cardId, 0, 0); // Reset position
+            await provider.releaseLock();
+            _hasDragLock = false;
+          }
           // Mark drag as complete - this will apply any pending updates
           provider.setDragging(false);
         },
         onDragUpdate: (details) {
           // Update drag position
-          provider.updateDragPosition(cardId, details.globalPosition.dx, details.globalPosition.dy);
+          if (_hasDragLock) {
+            provider.updateDragPosition(cardId, details.globalPosition.dx, details.globalPosition.dy);
+          }
         },
       );
     }
@@ -147,13 +156,13 @@ class _CardWidgetState extends State<CardWidget> {
       height: cardHeight,
       decoration: BoxDecoration(
         border: Border.all(
-          color: Colors.black.withOpacity(0.3),
+          color: Colors.black.withValues(alpha: 0.3),
           width: 1.0,
         ),
         borderRadius: BorderRadius.circular(8.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             spreadRadius: 1,
             blurRadius: 3,
             offset: const Offset(2, 2),
@@ -166,19 +175,42 @@ class _CardWidgetState extends State<CardWidget> {
 
   Widget _buildFaceDown(double cardWidth, double cardHeight) {
     final assetPath = 'assets/cards/svgs/card_face_down.svg';
-    print('DEBUG: Loading face down card from: $assetPath');
     return SvgPicture.asset(
       assetPath,
       width: cardWidth,
       height: cardHeight,
       fit: BoxFit.contain,
       placeholderBuilder: (context) {
-        print('DEBUG: Face down card placeholder triggered');
         return Container(
           width: cardWidth,
           height: cardHeight,
           color: Colors.blue,
-          child: const Text('SVG Loading...', style: TextStyle(color: Colors.white)),
+          child: const Text('SVG Loading...', style: TextStyle(color: Colors.white, fontSize: 8)),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('❌ ERROR loading card_face_down.svg: $error');
+        debugPrint('Stack trace: $stackTrace');
+        return Container(
+          width: cardWidth,
+          height: cardHeight,
+          decoration: BoxDecoration(
+            color: Colors.red.withValues(alpha: 0.7),
+            border: Border.all(color: Colors.red, width: 2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, color: Colors.white, size: 24),
+              const SizedBox(height: 4),
+              Text(
+                'Face Down\nSVG Error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 8),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -186,8 +218,6 @@ class _CardWidgetState extends State<CardWidget> {
 
   Widget _buildFaceUp(double cardWidth, double cardHeight) {
     final assetPath = _getCardAssetPath();
-    print('DEBUG: Loading face up card from: $assetPath');
-    print('DEBUG: Card suit=${widget.card.suit}, rank=${widget.card.rank}');
     
     return Container(
       width: cardWidth,
@@ -199,7 +229,6 @@ class _CardWidgetState extends State<CardWidget> {
         height: cardHeight,
         fit: BoxFit.fill,
         placeholderBuilder: (context) {
-          print('DEBUG: Face up card placeholder triggered for: $assetPath');
           return Container(
             width: cardWidth,
             height: cardHeight,
@@ -208,11 +237,6 @@ class _CardWidgetState extends State<CardWidget> {
           );
         },
         errorBuilder: (context, error, stackTrace) {
-          print('ERROR: SVG failed to load for: $assetPath');
-          print('ERROR details: $error');
-          if (stackTrace != null) {
-            print('ERROR stackTrace: $stackTrace');
-          }
           return Container(
             width: cardWidth,
             height: cardHeight,

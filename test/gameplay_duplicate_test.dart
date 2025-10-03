@@ -21,19 +21,11 @@ void main() {
       }
 
       // Add cards from stock
-      final stockCards = <Card>[];
-      while (!gameState.stock.isEmpty) {
-        final card = gameState.stock.drawCard();
-        if (card != null) {
-          stockCards.add(card);
-        }
-      }
+      final stockCards = List<Card>.from(gameState.stock.cards);
       allCards.addAll(stockCards);
 
       // Add cards from waste
       allCards.addAll(gameState.waste);
-
-      print('Initial game state has ${allCards.length} cards');
 
       // Verify initial uniqueness
       final initialCardSet = allCards.map((c) => '${c.suit}-${c.rank}').toSet();
@@ -57,19 +49,11 @@ void main() {
       }
 
       // Add cards from stock
-      final deserializedStockCards = <Card>[];
-      while (!gameStateFromJson.stock.isEmpty) {
-        final card = gameStateFromJson.stock.drawCard();
-        if (card != null) {
-          deserializedStockCards.add(card);
-        }
-      }
+      final deserializedStockCards = List<Card>.from(gameStateFromJson.stock.cards);
       deserializedCards.addAll(deserializedStockCards);
 
       // Add cards from waste
       deserializedCards.addAll(gameStateFromJson.waste);
-
-      print('Deserialized game state has ${deserializedCards.length} cards');
 
       // Verify deserialized cards are unique
       final deserializedCardSet = deserializedCards.map((c) => '${c.suit}-${c.rank}').toSet();
@@ -143,8 +127,6 @@ void main() {
       final finalCards = _collectAllCards(gameState);
       final finalSet = finalCards.map((c) => '${c.suit}-${c.rank}').toSet();
       expect(finalSet.length, 52, reason: 'Cards should remain unique after all movements');
-
-      print('Final verification: ${finalCards.length} cards, ${finalSet.length} unique combinations');
     });
 
     test('Multiple game state operations maintain uniqueness', () {
@@ -168,8 +150,9 @@ void main() {
       expect(set1.length, 52);
       expect(set2.length, 52);
       // The sets should be different (different shuffle)
-      expect(set1, isNot(equals(set2)));
+      expect(set1 == set2, false);
     });
+
   });
 }
 
@@ -188,14 +171,7 @@ List<Card> _collectAllCards(GameState gameState) {
   }
 
   // Add cards from stock
-  final stockCards = <Card>[];
-  final originalStockLength = gameState.stock.length;
-  for (int i = 0; i < originalStockLength; i++) {
-    final card = gameState.stock.drawCard();
-    if (card != null) {
-      stockCards.add(card);
-    }
-  }
+  final stockCards = List<Card>.from(gameState.stock.cards);
   allCards.addAll(stockCards);
 
   // Add cards from waste

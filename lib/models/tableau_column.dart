@@ -1,44 +1,25 @@
 import 'card.dart';
+import '../utils/json_utils.dart';
 
 class TableauColumn {
   List<Card> cards = [];
 
   Map<String, dynamic> toJson() {
-    print('=== TABLEAU COLUMN SERIALIZATION ===');
-    print('Column has ${cards.length} cards');
-    for (int i = 0; i < cards.length; i++) {
-      final card = cards[i];
-      print('  Serializing column card $i: ${card.suit} ${card.rank} (faceUp: ${card.faceUp})');
-    }
-    
     final json = {
       'cards': cards.map((card) => card.toJson()).toList(),
     };
     
-    print('Serialized column JSON cards length: ${(json['cards'] as List).length}');
-    print('=== END TABLEAU COLUMN SERIALIZATION ===');
     return json;
   }
 
   static TableauColumn fromJson(Map<String, dynamic> json) {
-    print('=== TABLEAU COLUMN DESERIALIZATION ===');
     final column = TableauColumn();
-    final cardsList = json['cards'] as List?;
-    print('Column JSON cards list length: ${cardsList?.length}');
-    
-    if (cardsList != null) {
-      column.cards = cardsList
-          .map((card) => Card.fromJson(card as Map<String, dynamic>))
+    if (json.containsKey('cards') && json['cards'] != null) {
+      column.cards = normalizeMapList(json['cards'])
+          .map((card) => Card.fromJson(card))
           .toList();
-          
-      print('Deserialized column has ${column.cards.length} cards');
-      for (int i = 0; i < column.cards.length; i++) {
-        final card = column.cards[i];
-        print('  Deserialized column card $i: ${card.suit} ${card.rank} (faceUp: ${card.faceUp})');
-      }
     }
-    
-    print('=== END TABLEAU COLUMN DESERIALIZATION ===');
+
     return column;
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
@@ -21,12 +23,11 @@ class FoundationPileWidget extends StatefulWidget {
 }
 
 class _FoundationPileWidgetState extends State<FoundationPileWidget> {
-
   @override
   Widget build(BuildContext context) {
     final cardWidth = context.cardWidth;
     final cardHeight = context.cardHeight;
-    
+
     return DragTarget<card_model.Card>(
       onWillAcceptWithDetails: (details) => _canAcceptCard(details.data),
       onAcceptWithDetails: (details) => _onAcceptCard(context, details.data),
@@ -54,7 +55,11 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
     );
   }
 
-  Widget _buildEmptyPlaceholder(BuildContext context, double cardWidth, double cardHeight) {
+  Widget _buildEmptyPlaceholder(
+    BuildContext context,
+    double cardWidth,
+    double cardHeight,
+  ) {
     return Center(
       child: Container(
         width: cardWidth * 0.75,
@@ -65,7 +70,9 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
         ),
         child: Center(
           child: Text(
-            widget.pile.suit.name[0].toUpperCase(),
+            widget.pile.suit != null
+                ? widget.pile.suit!.name[0].toUpperCase()
+                : 'A',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: context.cardFontSize * 1.5,
@@ -90,14 +97,15 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
 
     // Check waste
     if (gameState.waste.isNotEmpty && gameState.waste.last == card) {
-      provider.moveWasteToFoundation(widget.pileIndex);
+      unawaited(provider.moveWasteToFoundation(widget.pileIndex));
       return;
     }
 
     // Check tableau
     for (int i = 0; i < gameState.tableau.length; i++) {
-      if (gameState.tableau[i].cards.isNotEmpty && gameState.tableau[i].topCard == card) {
-        provider.moveTableauToFoundation(i, widget.pileIndex);
+      if (gameState.tableau[i].cards.isNotEmpty &&
+          gameState.tableau[i].topCard == card) {
+        unawaited(provider.moveTableauToFoundation(i, widget.pileIndex));
         return;
       }
     }

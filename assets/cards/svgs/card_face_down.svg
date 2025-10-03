@@ -2,11 +2,13 @@
   <!-- Card background -->
   <rect width="80" height="112" rx="6" ry="6" fill="#4169e1" stroke="#000" stroke-width="1"/>
 
-  <!-- Card shadow -->
-  <rect x="2" y="2" width="80" height="112" rx="6" ry="6" fill="none" stroke="#000" stroke-width="0.5" opacity="0.2"/>
-
-  <!-- Face down pattern -->
-  <g fill="#ffffff" opacity="0.9">
-    <text x="40" y="56" text-anchor="middle" font-family="Arial, sans-serif" font-size="20">♠</text>
+  <!-- Decorative pattern - simple geometric design -->
+  <g fill="#ffffff" opacity="0.3">
+    <!-- Diagonal lines pattern -->
+    <line x1="10" y1="10" x2="70" y2="70" stroke="#ffffff" stroke-width="2"/>
+    <line x1="70" y1="10" x2="10" y2="70" stroke="#ffffff" stroke-width="2"/>
+    <line x1="10" y1="42" x2="70" y2="102" stroke="#ffffff" stroke-width="2"/>
+    <line x1="70" y1="42" x2="10" y2="102" stroke="#ffffff" stroke-width="2"/>
+    <circle cx="40" cy="56" r="15" fill="none" stroke="#ffffff" stroke-width="3"/>
   </g>
 </svg>

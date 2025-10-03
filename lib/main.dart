@@ -4,10 +4,11 @@ import 'package:provider/provider.dart';
 import 'providers/game_provider.dart';
 import 'screens/game_screen.dart';
 import 'screens/error_screen.dart';
-import 'models/game_state.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'models/game_state.dart';
+import 'services/firebase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +46,10 @@ class KlondikeApp extends StatelessWidget {
             return const ErrorScreen(message: 'Invalid game ID format');
           }
           return ChangeNotifierProvider(
-            create: (context) => GameProvider(gameId: gameId),
+            create: (context) => GameProvider(
+              firebaseService: FirebaseService(),
+              gameId: gameId,
+            ),
             child: const GameScreen(),
           );
         },
@@ -56,7 +60,11 @@ class KlondikeApp extends StatelessWidget {
           // Create a new game state when hitting the root
           final gameState = GameState();
           return ChangeNotifierProvider(
-            create: (context) => GameProvider(gameId: gameState.gameId),
+            create: (context) => GameProvider(
+              firebaseService: FirebaseService(),
+              gameId: gameState.gameId,
+              isInitialSetup: true,
+            ),
             child: Builder(
               builder: (context) {
                 // Redirect to the game URL after provider is ready
