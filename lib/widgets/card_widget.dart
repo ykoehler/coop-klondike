@@ -116,15 +116,19 @@ class _CardWidgetState extends State<CardWidget> {
           }
 
           if (await provider.acquireLock('drag')) {
+            // Mark as dragging to prevent state updates during drag
+            provider.setDragging(true);
             // Start broadcasting drag position
             final position = box.localToGlobal(Offset.zero);
             provider.updateDragPosition(cardId, position.dx, position.dy);
           }
         },
-        onDragEnd: (_) async {
+        onDragEnd: (details) async {
           // Stop broadcasting drag position
-          await provider.releaseLock();
           provider.updateDragPosition(cardId, 0, 0); // Reset position
+          await provider.releaseLock();
+          // Mark drag as complete - this will apply any pending updates
+          provider.setDragging(false);
         },
         onDragUpdate: (details) {
           // Update drag position
@@ -137,29 +141,91 @@ class _CardWidgetState extends State<CardWidget> {
   }
 
   Widget _buildCardContent(BuildContext context, double cardWidth, double cardHeight, double tableauSpacing) {
-    return SizedBox(
+    return Container(
       width: cardWidth,
       height: cardHeight,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Colors.black.withOpacity(0.3),
+          width: 1.0,
+        ),
+        borderRadius: BorderRadius.circular(8.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(2, 2),
+          ),
+        ],
+      ),
       child: widget.card.faceUp ? _buildFaceUp(cardWidth, cardHeight) : _buildFaceDown(cardWidth, cardHeight),
     );
   }
 
   Widget _buildFaceDown(double cardWidth, double cardHeight) {
-    return SvgPicture.asset(
-      'assets/cards/svgs/card_face_down.svg',
-      width: cardWidth,
-      height: cardHeight,
-      fit: BoxFit.contain,
-    );
-  }
-
-  Widget _buildFaceUp(double cardWidth, double cardHeight) {
-    final assetPath = _getCardAssetPath();
+    final assetPath = 'assets/cards/svgs/card_face_down.svg';
+    print('DEBUG: Loading face down card from: $assetPath');
     return SvgPicture.asset(
       assetPath,
       width: cardWidth,
       height: cardHeight,
       fit: BoxFit.contain,
+      placeholderBuilder: (context) {
+        print('DEBUG: Face down card placeholder triggered');
+        return Container(
+          width: cardWidth,
+          height: cardHeight,
+          color: Colors.blue,
+          child: const Text('SVG Loading...', style: TextStyle(color: Colors.white)),
+        );
+      },
+    );
+  }
+
+  Widget _buildFaceUp(double cardWidth, double cardHeight) {
+    final assetPath = _getCardAssetPath();
+    print('DEBUG: Loading face up card from: $assetPath');
+    print('DEBUG: Card suit=${widget.card.suit}, rank=${widget.card.rank}');
+    
+    return Container(
+      width: cardWidth,
+      height: cardHeight,
+      alignment: Alignment.center,
+      child: SvgPicture.asset(
+        assetPath,
+        width: cardWidth,
+        height: cardHeight,
+        fit: BoxFit.fill,
+        placeholderBuilder: (context) {
+          print('DEBUG: Face up card placeholder triggered for: $assetPath');
+          return Container(
+            width: cardWidth,
+            height: cardHeight,
+            color: Colors.red,
+            child: Text('SVG Loading...\n$assetPath', style: TextStyle(color: Colors.white, fontSize: 10)),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          print('ERROR: SVG failed to load for: $assetPath');
+          print('ERROR details: $error');
+          if (stackTrace != null) {
+            print('ERROR stackTrace: $stackTrace');
+          }
+          return Container(
+            width: cardWidth,
+            height: cardHeight,
+            color: Colors.orange,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('SVG Error', style: TextStyle(color: Colors.white, fontSize: 12)),
+                Text(widget.card.toString(), style: TextStyle(color: Colors.white, fontSize: 10)),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

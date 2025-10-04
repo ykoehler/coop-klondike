@@ -275,12 +275,6 @@ class ResponsiveUtils {
     }
   }
 
-  /// Get responsive stock/waste pile size
-  static double getStockPileSize(BuildContext context) {
-    final cardWidth = getCardWidth(context);
-    return cardWidth * 0.7; // Slightly smaller than main cards
-  }
-
   /// Get responsive game area width percentage
   static double getGameAreaWidthPercentage(BuildContext context) {
     final sizeCategory = getSizeCategory(MediaQuery.of(context).size.width);
@@ -435,9 +429,6 @@ extension ResponsiveContext on BuildContext {
 
   /// Get responsive foundation spacing
   double get foundationSpacing => ResponsiveUtils.getFoundationSpacing(this);
-
-  /// Get responsive stock pile size
-  double get stockPileSize => ResponsiveUtils.getStockPileSize(this);
 
   /// Get responsive game area width percentage
   double get gameAreaWidthPercentage => ResponsiveUtils.getGameAreaWidthPercentage(this);
