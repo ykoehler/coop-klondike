@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/game_state.dart';
 
@@ -41,33 +42,51 @@ class FirebaseService {
 
   // Create or update a game
   Future<void> updateGame(String gameId, GameState gameState) async {
-    print('=== FIREBASE UPDATE GAME ===');
-    print('GameId: $gameId');
-    print('Updating game state to Firebase');
     final json = gameState.toJson();
-    print('JSON tableau length being sent to Firebase: ${(json['tableau'] as List).length}');
+    
+    debugPrint('📤 FIREBASE OUT [updateGame]: gameId=$gameId');
+    debugPrint('   Stock: ${gameState.stock.length} cards, Waste: ${gameState.waste.length} cards');
+    debugPrint('   Total cards: ${_countTotalCards(gameState)}');
     
     await _gamesRef.child(gameId).set(json);
-    print('Firebase update completed');
-    print('=== END FIREBASE UPDATE GAME ===');
+    
+    debugPrint('✅ FIREBASE OUT [updateGame]: Complete');
+  }
+  
+  int _countTotalCards(GameState state) {
+    int total = 0;
+    for (final column in state.tableau) {
+      total += column.cards.length;
+    }
+    total += state.stock.length;
+    total += state.waste.length;
+    for (final foundation in state.foundations) {
+      total += foundation.cards.length;
+    }
+    return total;
   }
 
   // Atomic game creation - only succeeds if game doesn't exist
   Future<bool> createGameIfNotExists(String gameId, GameState gameState) async {
     try {
+      debugPrint('📤 FIREBASE OUT [createGameIfNotExists]: gameId=$gameId');
+      debugPrint('   Stock: ${gameState.stock.length} cards, Waste: ${gameState.waste.length} cards');
+      
       // Use transaction to atomically check-and-set
       final transactionResult = await _gamesRef.child(gameId).runTransaction((currentData) {
         if (currentData != null) {
           // Game already exists, abort transaction
+          debugPrint('⚠️  FIREBASE OUT [createGameIfNotExists]: Game already exists, aborting');
           return Transaction.abort();
         }
         // Game doesn't exist, create it
         return Transaction.success(gameState.toJson());
       });
       
+      debugPrint('✅ FIREBASE OUT [createGameIfNotExists]: ${transactionResult.committed ? "Created" : "Already exists"}');
       return transactionResult.committed;
     } catch (e) {
-      print('Error in createGameIfNotExists: $e');
+      debugPrint('❌ FIREBASE OUT [createGameIfNotExists]: Error - $e');
       return false;
     }
   }
@@ -84,31 +103,43 @@ class FirebaseService {
 
   // Listen to game changes
   Stream<GameState> listenToGame(String gameId) {
-    return _gamesRef.child(gameId).onValue.map((event) {
-      print('=== FIREBASE LISTENER TRIGGERED ===');
-      print('GameId: $gameId');
-      print('Raw Firebase data received: ${event.snapshot.value != null}');
-      
-      if (event.snapshot.value == null) {
-        print('No data found in Firebase for game: $gameId');
-        throw Exception('Game not found');
-      }
-      
-      final rawData = event.snapshot.value!;
-      print('Raw data type: ${rawData.runtimeType}');
-      
-      final data = _convertToStringDynamicMap(rawData);
-      print('Converted data tableau length: ${(data['tableau'] as List?)?.length}');
-      print('=== END FIREBASE LISTENER ===');
-      
-      return GameState.fromJson(data);
-    });
+    return _gamesRef.child(gameId).onValue.transform(
+      StreamTransformer<DatabaseEvent, GameState>.fromHandlers(
+        handleData: (event, sink) {
+          try {
+            if (event.snapshot.value == null) {
+              sink.addError(Exception('Game not found'));
+              return;
+            }
+            
+            final rawData = event.snapshot.value!;
+            final data = _convertToStringDynamicMap(rawData);
+            final gameState = GameState.fromJson(data);
+            
+            debugPrint('📥 FIREBASE IN [listenToGame]: gameId=$gameId');
+            debugPrint('   Stock: ${gameState.stock.length} cards, Waste: ${gameState.waste.length} cards');
+            debugPrint('   Total cards: ${_countTotalCards(gameState)}');
+            
+            sink.add(gameState);
+          } catch (e, stackTrace) {
+            debugPrint('❌ FIREBASE IN [listenToGame]: Failed to deserialize game state: $e');
+            debugPrint('Stack trace: $stackTrace');
+            sink.addError(e, stackTrace);
+          }
+        },
+        handleError: (error, stackTrace, sink) {
+          debugPrint('❌ FIREBASE IN [listenToGame]: Stream error: $error');
+          sink.addError(error, stackTrace);
+        },
+      ),
+    );
   }
 
   // Set game lock
   Future<void> setGameLock(String gameId, String playerId, bool isLocked) async {
     await _gamesRef.child('$gameId/lock').set({
-      'locked': isLocked,
+      'isLocked': isLocked,
+      'locked': isLocked, // legacy compatibility
       'playerId': playerId,
       'timestamp': ServerValue.timestamp,
     });
@@ -116,12 +147,32 @@ class FirebaseService {
 
   // Listen to game lock changes
   Stream<Map<String, dynamic>> listenToGameLock(String gameId) {
-    return _gamesRef.child('$gameId/lock').onValue.map((event) {
-      if (event.snapshot.value == null) {
-        return {'locked': false, 'playerId': null, 'timestamp': DateTime.now().millisecondsSinceEpoch};
-      }
-      return _convertToStringDynamicMap(event.snapshot.value!);
-    });
+    return _gamesRef.child('$gameId/lock').onValue.transform(
+      StreamTransformer<DatabaseEvent, Map<String, dynamic>>.fromHandlers(
+        handleData: (event, sink) {
+          try {
+            if (event.snapshot.value == null) {
+              sink.add({
+                'isLocked': false,
+                'locked': false,
+                'playerId': null,
+                'timestamp': DateTime.now().millisecondsSinceEpoch,
+              });
+              return;
+            }
+            final data = _convertToStringDynamicMap(event.snapshot.value!);
+            sink.add(data);
+          } catch (e, stackTrace) {
+            debugPrint('Firebase lock listener: Error: $e');
+            sink.addError(e, stackTrace);
+          }
+        },
+        handleError: (error, stackTrace, sink) {
+          debugPrint('Firebase lock listener: Stream error: $error');
+          sink.addError(error, stackTrace);
+        },
+      ),
+    );
   }
 
   // Update card drag position
@@ -137,11 +188,26 @@ class FirebaseService {
 
   // Listen to card drag position changes
   Stream<Map<String, dynamic>> listenToDragPosition(String gameId) {
-    return _gamesRef.child('$gameId/dragState').onValue.map((event) {
-      if (event.snapshot.value == null) {
-        return {'cardId': '', 'x': 0.0, 'y': 0.0, 'timestamp': DateTime.now().millisecondsSinceEpoch};
-      }
-      return _convertToStringDynamicMap(event.snapshot.value!);
-    });
+    return _gamesRef.child('$gameId/dragState').onValue.transform(
+      StreamTransformer<DatabaseEvent, Map<String, dynamic>>.fromHandlers(
+        handleData: (event, sink) {
+          try {
+            if (event.snapshot.value == null) {
+              sink.add({'cardId': '', 'x': 0.0, 'y': 0.0, 'timestamp': DateTime.now().millisecondsSinceEpoch});
+              return;
+            }
+            final data = _convertToStringDynamicMap(event.snapshot.value!);
+            sink.add(data);
+          } catch (e, stackTrace) {
+            debugPrint('Firebase drag listener: Error: $e');
+            sink.addError(e, stackTrace);
+          }
+        },
+        handleError: (error, stackTrace, sink) {
+          debugPrint('Firebase drag listener: Stream error: $error');
+          sink.addError(error, stackTrace);
+        },
+      ),
+    );
   }
 }

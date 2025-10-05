@@ -13,13 +13,16 @@ class GameLock {
 
   Map<String, dynamic> toJson() => {
     'isLocked': isLocked,
+    'locked': isLocked, // legacy compatibility for existing data
     'playerId': playerId,
     'timestamp': timestamp,
     'action': action,
   };
 
   static GameLock fromJson(Map<String, dynamic> json) => GameLock(
-    isLocked: json['isLocked'] as bool? ?? false,
+    isLocked: (json.containsKey('isLocked')
+            ? json['isLocked']
+            : json['locked']) as bool? ?? false,
     playerId: json['playerId'] as String?,
     timestamp: (json['timestamp'] as num?)?.toInt() ?? DateTime.now().millisecondsSinceEpoch,
     action: json['action'] as String?,

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Card Face Down Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #2d2d2d;
+            color: white;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #3d3d3d;
+            border-radius: 8px;
+        }
+        .card-container {
+            display: inline-block;
+            margin: 10px;
+            padding: 10px;
+            background-color: #1d1d1d;
+            border-radius: 8px;
+        }
+        .card-container img {
+            display: block;
+            border: 2px solid #4169e1;
+            border-radius: 8px;
+        }
+        .card-container svg {
+            display: block;
+            border: 2px solid #4169e1;
+            border-radius: 8px;
+        }
+        h2 {
+            color: #4169e1;
+        }
+        .error {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .success {
+            color: #51cf66;
+            font-weight: bold;
+        }
+        .log {
+            background-color: #1d1d1d;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🃏 SVG Card Face Down Loading Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Direct SVG File Reference (img tag)</h2>
+        <div class="card-container">
+            <img id="img-test" src="assets/assets/cards/svgs/card_face_down.svg" 
+                 width="120" height="168" 
+                 alt="Card Face Down"
+                 onload="logSuccess('img-test', 'Image loaded successfully')"
+                 onerror="logError('img-test', 'Image failed to load')">
+            <p id="img-test-status">Loading...</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Inline SVG from File</h2>
+        <div class="card-container" id="inline-svg-container">
+            <p id="inline-svg-status">Loading...</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. SVG via Object Tag</h2>
+        <div class="card-container">
+            <object id="object-test" data="assets/assets/cards/svgs/card_face_down.svg" 
+                    type="image/svg+xml" width="120" height="168">
+                SVG not supported
+            </object>
+            <p id="object-test-status">Loading...</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. SVG via Fetch API (Flutter-like)</h2>
+        <div class="card-container" id="fetch-svg-container">
+            <p id="fetch-svg-status">Loading...</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Test Sample Face-Up Cards</h2>
+        <div class="card-container">
+            <img src="assets/assets/cards/svgs/hearts_a.svg" width="120" height="168" alt="Ace of Hearts"
+                 onload="logSuccess('hearts-a', 'Hearts Ace loaded')"
+                 onerror="logError('hearts-a', 'Hearts Ace failed')">
+            <p id="hearts-a-status">Hearts A</p>
+        </div>
+        <div class="card-container">
+            <img src="assets/assets/cards/svgs/spades_k.svg" width="120" height="168" alt="King of Spades"
+                 onload="logSuccess('spades-k', 'Spades King loaded')"
+                 onerror="logError('spades-k', 'Spades King failed')">
+            <p id="spades-k-status">Spades K</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Log</h2>
+        <div class="log" id="console-log"></div>
+    </div>
+
+    <script>
+        const consoleLog = document.getElementById('console-log');
+        
+        function log(message, isError = false) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.style.color = isError ? '#ff6b6b' : '#51cf66';
+            entry.textContent = `[${timestamp}] ${message}`;
+            consoleLog.appendChild(entry);
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+            console.log(message);
+        }
+
+        function logSuccess(id, message) {
+            log(`✓ ${message}`, false);
+            const status = document.getElementById(`${id}-status`);
+            if (status) {
+                status.innerHTML = `<span class="success">✓ Loaded</span>`;
+            }
+        }
+
+        function logError(id, message) {
+            log(`✗ ${message}`, true);
+            const status = document.getElementById(`${id}-status`);
+            if (status) {
+                status.innerHTML = `<span class="error">✗ Failed</span>`;
+            }
+        }
+
+        // Test 2: Load SVG inline
+        fetch('assets/assets/cards/svgs/card_face_down.svg')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(svgText => {
+                const container = document.getElementById('inline-svg-container');
+                container.innerHTML = svgText + '<p id="inline-svg-status"></p>';
+                logSuccess('inline-svg', 'Inline SVG loaded via fetch');
+            })
+            .catch(error => {
+                logError('inline-svg', `Inline SVG failed: ${error.message}`);
+            });
+
+        // Test 4: Fetch and parse like Flutter might
+        fetch('assets/assets/cards/svgs/card_face_down.svg')
+            .then(response => response.text())
+            .then(svgText => {
+                const container = document.getElementById('fetch-svg-container');
+                const parser = new DOMParser();
+                const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+                
+                // Check for parsing errors
+                const parseError = svgDoc.querySelector('parsererror');
+                if (parseError) {
+                    throw new Error('SVG parsing error: ' + parseError.textContent);
+                }
+                
+                const svgElement = svgDoc.documentElement;
+                svgElement.setAttribute('width', '120');
+                svgElement.setAttribute('height', '168');
+                
+                container.innerHTML = '';
+                container.appendChild(svgElement);
+                
+                const statusP = document.createElement('p');
+                statusP.id = 'fetch-svg-status';
+                container.appendChild(statusP);
+                
+                logSuccess('fetch-svg', 'SVG parsed and rendered via DOMParser');
+            })
+            .catch(error => {
+                logError('fetch-svg', `Fetch+parse failed: ${error.message}`);
+            });
+
+        // Test object tag load
+        document.getElementById('object-test').addEventListener('load', function() {
+            logSuccess('object-test', 'Object tag loaded SVG');
+        });
+
+        // Log initial page load
+        window.addEventListener('load', function() {
+            log('Page fully loaded', false);
+        });
+
+        // Catch any errors
+        window.addEventListener('error', function(e) {
+            logError('window', `Global error: ${e.message} at ${e.filename}:${e.lineno}`);
+        });
+    </script>
+</body>
+</html>

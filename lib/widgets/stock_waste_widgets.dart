@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/game_provider.dart';
@@ -13,9 +15,23 @@ class StockPileWidget extends StatelessWidget {
     final hasCards = !provider.gameState.stock.isEmpty;
     final cardWidth = context.cardWidth;
     final cardHeight = context.cardHeight;
+    final interactionsDisabled = provider.hasPendingAction || provider.isLocked;
+
+    VoidCallback? onTap;
+    if (!interactionsDisabled) {
+      if (hasCards) {
+        onTap = () {
+          unawaited(provider.drawCard());
+        };
+      } else if (provider.gameState.waste.isNotEmpty) {
+        onTap = () {
+          unawaited(provider.recycleWaste());
+        };
+      }
+    }
 
     return GestureDetector(
-      onTap: hasCards ? () => provider.drawCard() : (provider.gameState.waste.isNotEmpty ? () => provider.recycleWaste() : null),
+      onTap: onTap,
       child: Container(
         width: cardWidth,
         height: cardHeight,
@@ -48,8 +64,6 @@ class WastePileWidget extends StatelessWidget {
     final waste = provider.gameState.waste;
     final cardWidth = context.cardWidth;
     final cardHeight = context.cardHeight;
-
-    print('DEBUG: WastePileWidget build - waste has ${waste.length} cards, dimensions: ${cardWidth}x${cardHeight}');
 
     return SizedBox(
       width: cardWidth,

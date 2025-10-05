@@ -1,4 +1,6 @@
 import '../models/game_state.dart';
+import '../models/card.dart';
+import 'package:flutter/foundation.dart';
 
 class GameLogic {
   // Draw card from stock to waste
@@ -8,14 +10,28 @@ class GameLogic {
 
   static void drawCard(GameState state, DrawMode mode) {
     if (!canDrawCard(state, mode)) return;
+    
+    final stockBefore = state.stock.length;
+    final wasteBefore = state.waste.length;
+    
     int numToDraw = mode == DrawMode.one ? 1 : (state.stock.length < 3 ? state.stock.length : 3);
+    debugPrint('  📥 LOGIC drawCard: Drawing $numToDraw cards from stock (stock=$stockBefore, waste=$wasteBefore)');
+    
     for (int i = 0; i < numToDraw; i++) {
       final card = state.stock.drawCard();
       if (card != null) {
+        debugPrint('    → Drew ${card.rank.name}-${card.suit.name}');
         card.faceUp = true;
         state.waste.add(card);
+      } else {
+        debugPrint('    ⚠️ WARNING: drawCard returned null!');
       }
     }
+    
+    debugPrint('  📥 LOGIC drawCard: Complete (stock=${state.stock.length}, waste=${state.waste.length})');
+    
+    // Log stock operation for debugging
+    _logStockOperation(state, 'draw', numToDraw);
   }
 
   // Move from waste to tableau
@@ -114,8 +130,32 @@ class GameLogic {
 
   static void recycleWaste(GameState state) {
     if (canRecycleWaste(state)) {
-      state.stock.addCards(state.waste);
+      final stockBefore = state.stock.length;
+      final wasteBefore = state.waste.length;
+      debugPrint('  ♻️ LOGIC recycleWaste: BEFORE (stock=$stockBefore, waste=$wasteBefore)');
+      
+      // Log the waste cards that will be recycled
+      debugPrint('    Waste cards to recycle: ${state.waste.map((c) => '${c.rank.name}${c.suit.name}').join(', ')}');
+      
+      // Reverse the waste cards when moving back to stock
+      // This ensures they come out in the same order when drawn again
+      final reversedWaste = state.waste.reversed.toList();
+      debugPrint('    Reversed waste list created with ${reversedWaste.length} cards');
+      
+      state.stock.addCards(reversedWaste);
+      debugPrint('    After addCards: stock=${state.stock.length}');
+      
       state.waste.clear();
+      debugPrint('    After waste.clear(): waste=${state.waste.length}');
+      
+      debugPrint('  ♻️ LOGIC recycleWaste: AFTER (stock=${state.stock.length}, waste=${state.waste.length})');
+      
+      // Log stock operation for debugging
+      _logStockOperation(state, 'recycle', state.stock.length);
+      
+      // After recycling, immediately draw so waste is never empty
+      debugPrint('  ♻️ LOGIC recycleWaste: Auto-drawing after recycle to keep waste non-empty');
+      drawCard(state, state.drawMode);
     }
   }
 
@@ -167,5 +207,36 @@ class GameLogic {
     }
 
     return true; // No moves possible
+  }
+
+  /// Logs stock operations for debugging duplicate card issues
+  static void _logStockOperation(GameState state, String operation, int count) {
+    final allCards = <Card>[];
+    for (final column in state.tableau) {
+      allCards.addAll(column.cards);
+    }
+    allCards.addAll(state.stock.cards);
+    allCards.addAll(state.waste);
+    for (final foundation in state.foundations) {
+      allCards.addAll(foundation.cards);
+    }
+
+    final cardSignatures = allCards.map((card) => '${card.suit}-${card.rank}').toSet();
+    final hasDuplicates = cardSignatures.length != allCards.length;
+
+    debugPrint('STOCK $operation: $count cards, total: ${allCards.length}, unique: ${cardSignatures.length}, duplicates: $hasDuplicates');
+    if (hasDuplicates) {
+      debugPrint('DUPLICATE ALERT: Found ${allCards.length - cardSignatures.length} duplicate cards!');
+      // Log duplicate details
+      final cardCounts = <String, int>{};
+      for (final card in allCards) {
+        final key = '${card.suit}-${card.rank}';
+        cardCounts[key] = (cardCounts[key] ?? 0) + 1;
+      }
+      final duplicates = cardCounts.entries.where((entry) => entry.value > 1);
+      for (final dup in duplicates) {
+        debugPrint('  ${dup.key}: ${dup.value} copies');
+      }
+    }
   }
 }

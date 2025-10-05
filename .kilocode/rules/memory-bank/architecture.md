@@ -28,8 +28,10 @@ Coop Klondike is a Flutter web application implementing collaborative multiplaye
 - `lib/logic/game_logic.dart` - All game rule validation and move execution
 - `lib/providers/game_provider.dart` - State management with Firebase synchronization
 - `lib/screens/game_screen.dart` - Main multiplayer game interface
+- `lib/screens/game_creation_screen.dart` - New game creation with seed input (planned)
 - `lib/screens/error_screen.dart` - Error handling for multiplayer issues
 - `lib/firebase_options.dart` - Firebase configuration
+- `lib/utils/seed_generator.dart` - Utility for generating passphrase-like seeds (planned)
 - `lib/widgets/` - Card widgets, pile widgets, game board with multiplayer indicators
 
 ## Key Technical Decisions
@@ -57,6 +59,13 @@ Coop Klondike is a Flutter web application implementing collaborative multiplaye
 - **Rationale**: Testable, predictable, no side effects
 - **Benefits**: Easy unit testing, clear validation logic, multiplayer compatibility
 - **Implementation**: Static methods for all game operations
+
+### Deterministic Shuffling
+**Decision**: User-provided seed (10-15 char English-like passphrase) for deterministic deck shuffling, separated by gameId
+- **Rationale**: Enables reproducible games for testing, sharing specific deals, and multiplayer consistency without altering existing logic
+- **Benefits**: Identical shuffles across players/sessions using same seed; overrideable default derived from gameId; maintains immutability post-creation
+- **Implementation**: Seed stored in GameState for Firebase sync; Deck.shuffle() uses seed-initialized Random(); Utility in seed_generator.dart for passphrase generation (e.g., word list-based like "whale42jump"); UI allows input/override before game start, read-only display after
+- **Trade-offs**: Adds minor state overhead; requires careful derivation (e.g., hash gameId to seed) for existing games
 
 ### UI Architecture
 **Decision**: Widget composition with drag-and-drop + real-time indicators
@@ -114,7 +123,9 @@ Firebase Database → FirebaseService → GameProvider → UI Components
 - **Pile Widgets** ↔ **GameProvider**: Pile state, drop events, and lock indicators
 - **GameLogic** ↔ **GameState**: Pure validation and mutation (unchanged)
 - **GameProvider** ↔ **FirebaseService**: Real-time synchronization and persistence
-- **GameProvider** ↔ **GameState**: State management wrapper with multiplayer coordination
+- **GameProvider** ↔ **GameState**: State management wrapper with multiplayer coordination (now includes seed handling for init)
+- **SeedGenerator** ↔ **GameCreationScreen**: Passphrase generation for new games
+- **GameState** ↔ **Deck**: Seed passed to shuffle for determinism
 - **FirebaseService** ↔ **Firebase Database**: Real-time data persistence and retrieval
 
 ### Dependencies
@@ -136,6 +147,23 @@ Firebase Database → FirebaseService → GameProvider → UI Components
 6. If valid: GameState updated and synced to Firebase
 7. GameLock released automatically
 8. All connected players' UI rebuilds with new card positions
+
+### Game Creation Flow (with Seed)
+```mermaid
+graph TD
+    A[App Start - No gameId] --> B[Route to GameCreationScreen]
+    B --> C[Generate/Show Random Seed in TextField]
+    C --> D[User Inputs/Overrides Seed or Clicks Generate]
+    D --> E[Derive gameId e.g. hash(seed) or UUID]
+    E --> F[Create GameState with Seed, Shuffle Deck using Seeded Random]
+    F --> G[Sync GameState to Firebase /games/{gameId}/gameState]
+    G --> H[Navigate to /game/{gameId}]
+    I[App Start - With gameId] --> J[Load GameState from Firebase]
+    J --> K[Extract Seed from GameState]
+    K --> L[If New: Shuffle Deck using Seeded Random; If Existing: Use Loaded State]
+    L --> H
+    H --> M[All Players Sync via GameState Stream, Use Same Seed for Consistency]
+```
 
 ### Multiplayer Game Initialization
 1. Player navigates to `/game/{gameId}` URL or creates new game
@@ -212,7 +240,7 @@ Firebase Database → FirebaseService → GameProvider → UI Components
 ```
 /games
   /{gameId}
-    /gameState - Complete game state JSON
+    /gameState - Complete game state JSON (includes seed field)
     /locks
       /{playerId} - Active locks with expiration
     /dragPositions

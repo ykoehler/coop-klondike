@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/game_provider.dart';
 import '../widgets/game_board.dart';
 import '../models/game_state.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import '../utils/responsive_utils.dart';
+import '../utils/test_hooks.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -16,6 +17,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   DrawMode _selectedDrawMode = DrawMode.three;
+  bool _hooksRegistered = false;
 
   @override
   void initState() {
@@ -23,6 +25,16 @@ class _GameScreenState extends State<GameScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForDialogDisplay();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hooksRegistered) {
+      final provider = Provider.of<GameProvider>(context, listen: false);
+      registerTestHooks(provider);
+      _hooksRegistered = true;
+    }
   }
 
   void _checkForDialogDisplay() {
@@ -75,6 +87,23 @@ class _GameScreenState extends State<GameScreen> {
       ),
     );
   }
+  
+  void _showNewGameDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => _NewGameDialog(
+        onCreateGame: (seed, drawMode) async {
+          final provider = Provider.of<GameProvider>(context, listen: false);
+          final newGameId = await provider.newGame(seed: seed, drawMode: drawMode);
+          if (newGameId != null && mounted) {
+            context.go('/game/$newGameId');
+          }
+        },
+      ),
+    );
+  }
+  
   void _showSettingsDialog() {
     final provider = Provider.of<GameProvider>(context, listen: false);
     setState(() => _selectedDrawMode = provider.drawMode);
@@ -164,7 +193,7 @@ class _GameScreenState extends State<GameScreen> {
               onPressed: _showSettingsDialog,
             ),
             ElevatedButton(
-              onPressed: _showDrawModeDialog,
+              onPressed: _showNewGameDialog,
               child: const Text('New Game'),
             ),
           ],
@@ -207,6 +236,163 @@ class _GameScreenState extends State<GameScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NewGameDialog extends StatefulWidget {
+  final Function(String seed, DrawMode drawMode) onCreateGame;
+
+  const _NewGameDialog({
+    required this.onCreateGame,
+  });
+
+  @override
+  State<_NewGameDialog> createState() => _NewGameDialogState();
+}
+
+class _NewGameDialogState extends State<_NewGameDialog> {
+  late TextEditingController _seedController;
+  DrawMode _selectedDrawMode = DrawMode.three;
+  bool _isProcessing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _seedController = TextEditingController(text: _generateSeed());
+  }
+
+  @override
+  void dispose() {
+    _seedController.dispose();
+    super.dispose();
+  }
+
+  String _generateSeed() {
+    const adjectives = ['blue', 'red', 'green', 'yellow', 'purple', 'orange', 'pink', 'crimson', 'silver', 'golden'];
+    const nouns = ['whale', 'tiger', 'eagle', 'dolphin', 'lion', 'shark', 'wolf', 'bear', 'hawk', 'fox'];
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final adj = adjectives[random % adjectives.length];
+    final num = (random % 100).toString().padLeft(2, '0');
+    final noun = nouns[(random ~/ 100) % nouns.length];
+    return '$adj$num$noun';
+  }
+
+  void _generateNewSeed() {
+    setState(() {
+      _seedController.text = _generateSeed();
+    });
+  }
+
+  Future<void> _handleCreateGame() async {
+    if (_isProcessing) return;
+    
+    setState(() => _isProcessing = true);
+    try {
+      String seed = _seedController.text.trim();
+      if (seed.isEmpty) {
+        seed = _generateSeed();
+      }
+      await widget.onCreateGame(seed, _selectedDrawMode);
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating game: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New Game Setup'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Enter a seed for the game deck:',
+            style: TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _seedController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'e.g., whale42jump',
+                    isDense: true,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: _isProcessing ? null : _generateNewSeed,
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Generate new seed',
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Stock draw mode:',
+            style: TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<DrawMode>(
+              segments: const [
+                ButtonSegment<DrawMode>(
+                  value: DrawMode.one,
+                  label: Text('1 Card'),
+                ),
+                ButtonSegment<DrawMode>(
+                  value: DrawMode.three,
+                  label: Text('3 Cards'),
+                ),
+              ],
+              selected: {_selectedDrawMode},
+              onSelectionChanged: _isProcessing
+                  ? null
+                  : (Set<DrawMode> selected) {
+                      setState(() {
+                        _selectedDrawMode = selected.first;
+                      });
+                    },
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '3 Card Draw is more challenging',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isProcessing ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isProcessing ? null : _handleCreateGame,
+          child: _isProcessing
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Create Game'),
+        ),
+      ],
     );
   }
 }

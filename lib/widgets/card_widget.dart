@@ -29,6 +29,7 @@ class CardWidget extends StatefulWidget {
 }
 
 class _CardWidgetState extends State<CardWidget> {
+  bool _hasDragLock = false;
 
   @override
   Widget build(BuildContext context) {
@@ -70,13 +71,17 @@ class _CardWidgetState extends State<CardWidget> {
     }
 
     // Add debug info
-    print('Card ${widget.card}: draggable=${widget.draggable}, faceUp=${widget.card.faceUp}, isLocked=${provider.isLocked}');
     
-    if (widget.draggable && widget.card.faceUp && !provider.isLocked) {
+    if (widget.draggable && widget.card.faceUp && !provider.isLocked && !provider.hasPendingAction) {
       Widget feedbackWidget = cardContent;
-      if (widget.column != null && widget.cardIndex != null) {
+      // Capture column and cardIndex early to avoid null issues during drag
+      final column = widget.column;
+      final cardIndex = widget.cardIndex;
+      
+      if (column != null && cardIndex != null && cardIndex < column.cards.length) {
         // Show the sub-stack
-        final subStack = widget.column!.cards.sublist(widget.cardIndex!);
+        // Create a defensive copy of the substack to avoid issues if column changes during drag
+        final subStack = List<card_model.Card>.from(column.cards.sublist(cardIndex));
         feedbackWidget = SizedBox(
           width: cardWidth,
           height: cardHeight + (subStack.length - 1) * tableauSpacing,
@@ -111,12 +116,16 @@ class _CardWidgetState extends State<CardWidget> {
           // Capture RenderBox before async operation to avoid context issues
           final RenderBox? box = context.findRenderObject() as RenderBox?;
           if (box == null) {
-            print('Warning: RenderBox not available for drag start');
+            return;
+          }
+
+          if (provider.hasPendingAction) {
             return;
           }
 
           if (await provider.acquireLock('drag')) {
             // Mark as dragging to prevent state updates during drag
+            _hasDragLock = true;
             provider.setDragging(true);
             // Start broadcasting drag position
             final position = box.localToGlobal(Offset.zero);
@@ -125,14 +134,19 @@ class _CardWidgetState extends State<CardWidget> {
         },
         onDragEnd: (details) async {
           // Stop broadcasting drag position
-          provider.updateDragPosition(cardId, 0, 0); // Reset position
-          await provider.releaseLock();
+          if (_hasDragLock) {
+            provider.updateDragPosition(cardId, 0, 0); // Reset position
+            await provider.releaseLock();
+            _hasDragLock = false;
+          }
           // Mark drag as complete - this will apply any pending updates
           provider.setDragging(false);
         },
         onDragUpdate: (details) {
           // Update drag position
-          provider.updateDragPosition(cardId, details.globalPosition.dx, details.globalPosition.dy);
+          if (_hasDragLock) {
+            provider.updateDragPosition(cardId, details.globalPosition.dx, details.globalPosition.dy);
+          }
         },
       );
     }
@@ -141,18 +155,19 @@ class _CardWidgetState extends State<CardWidget> {
   }
 
   Widget _buildCardContent(BuildContext context, double cardWidth, double cardHeight, double tableauSpacing) {
+    print('DEBUG: CardWidget _buildCardContent - card: ${widget.card}, faceUp: ${widget.card.faceUp}, dimensions: ${cardWidth}x${cardHeight}');
     return Container(
       width: cardWidth,
       height: cardHeight,
       decoration: BoxDecoration(
         border: Border.all(
-          color: Colors.black.withOpacity(0.3),
+          color: Colors.black.withValues(alpha: 0.3),
           width: 1.0,
         ),
         borderRadius: BorderRadius.circular(8.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             spreadRadius: 1,
             blurRadius: 3,
             offset: const Offset(2, 2),
@@ -165,19 +180,40 @@ class _CardWidgetState extends State<CardWidget> {
 
   Widget _buildFaceDown(double cardWidth, double cardHeight) {
     final assetPath = 'assets/cards/svgs/card_face_down.svg';
-    print('DEBUG: Loading face down card from: $assetPath');
+    debugPrint('🎴 Rendering face-down card: ${widget.card}');
     return SvgPicture.asset(
       assetPath,
       width: cardWidth,
       height: cardHeight,
       fit: BoxFit.contain,
+      // No placeholder needed since SVGs are precached
       placeholderBuilder: (context) {
-        print('DEBUG: Face down card placeholder triggered');
+        // Return invisible placeholder - SVGs should be cached already
+        return const SizedBox.shrink();
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('❌ ERROR loading card_face_down.svg for ${widget.card}: $error');
+        debugPrint('Stack trace: $stackTrace');
         return Container(
           width: cardWidth,
           height: cardHeight,
-          color: Colors.blue,
-          child: const Text('SVG Loading...', style: TextStyle(color: Colors.white)),
+          decoration: BoxDecoration(
+            color: Colors.red.withValues(alpha: 0.7),
+            border: Border.all(color: Colors.red, width: 2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, color: Colors.white, size: 24),
+              const SizedBox(height: 4),
+              Text(
+                'Face Down\nSVG Error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 8),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -185,8 +221,6 @@ class _CardWidgetState extends State<CardWidget> {
 
   Widget _buildFaceUp(double cardWidth, double cardHeight) {
     final assetPath = _getCardAssetPath();
-    print('DEBUG: Loading face up card from: $assetPath');
-    print('DEBUG: Card suit=${widget.card.suit}, rank=${widget.card.rank}');
     
     return Container(
       width: cardWidth,
@@ -197,21 +231,12 @@ class _CardWidgetState extends State<CardWidget> {
         width: cardWidth,
         height: cardHeight,
         fit: BoxFit.fill,
+        // No placeholder needed since SVGs are precached
         placeholderBuilder: (context) {
-          print('DEBUG: Face up card placeholder triggered for: $assetPath');
-          return Container(
-            width: cardWidth,
-            height: cardHeight,
-            color: Colors.red,
-            child: Text('SVG Loading...\n$assetPath', style: TextStyle(color: Colors.white, fontSize: 10)),
-          );
+          // Return invisible placeholder - SVGs should be cached already
+          return const SizedBox.shrink();
         },
         errorBuilder: (context, error, stackTrace) {
-          print('ERROR: SVG failed to load for: $assetPath');
-          print('ERROR details: $error');
-          if (stackTrace != null) {
-            print('ERROR stackTrace: $stackTrace');
-          }
           return Container(
             width: cardWidth,
             height: cardHeight,
