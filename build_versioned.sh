@@ -49,12 +49,15 @@ mv build/web/manifest.json "$VERSIONED_ASSETS_DIR/"
 mv build/web/.last_build_id "$VERSIONED_ASSETS_DIR/"
 
 # Update index.html base href to point to versioned directory
-sed -i.bak "s|<base href=\"/\">|<base href=\"/$VERSION/\">|g" build/web/index.html
+# Use portable sed syntax that works on both macOS and Linux
+sed "s|<base href=\"/\">|<base href=\"/$VERSION/\">|g" build/web/index.html > build/web/index.html.tmp
+mv build/web/index.html.tmp build/web/index.html
 
 # Update firebase.json to serve from root (default)
 cp firebase.json firebase.json.backup
-# Reset to default if it was changed
-sed -i.bak "s|\"public\":\"build/web/[^\"]*\"|\"public\":\"build/web\"|g" firebase.json
+# Reset to default if it was changed  
+sed "s|\"public\":\"build/web/[^\"]*\"|\"public\":\"build/web\"|g" firebase.json > firebase.json.tmp
+mv firebase.json.tmp firebase.json
 
 echo "Build complete!"
 echo "index.html at root with base href: /$VERSION/"
