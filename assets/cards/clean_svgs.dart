@@ -13,7 +13,7 @@ void main() async {
       .where((f) => f.path.endsWith('.svg'));
 
   for (final file in files) {
-  stdout.writeln('Processing ${file.path}...');
+    stdout.writeln('Processing ${file.path}...');
     String content = await file.readAsString();
     
     // Remove sodipodi and inkscape namespace declarations

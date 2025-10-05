@@ -7,3 +7,8 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 .cache
+
+# Test artifacts
+*.png
+test-results/
+playwright-report/

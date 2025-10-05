@@ -251,7 +251,7 @@ test.describe('Tableau Card Drag Tests', () => {
     await page.waitForTimeout(1000);
     
     // Take a screenshot to see the game state
-    await page.screenshot({ path: 'e2e/tableau-before-drag.png' });
+    await page.screenshot({ path: 'tableau-before-drag.png' });
     
     // Get tableau state to find a card to drag
     const tableauState = await page.evaluate(() => {
@@ -313,7 +313,7 @@ test.describe('Tableau Card Drag Tests', () => {
     console.log('Drag attempt result:', JSON.stringify(dragAttempt, null, 2));
     
     await page.waitForTimeout(1000);
-    await page.screenshot({ path: 'e2e/tableau-after-drag.png' });
+    await page.screenshot({ path: 'tableau-after-drag.png' });
     
     // Log all captured messages and errors
     console.log('\n=== Console Messages ===');

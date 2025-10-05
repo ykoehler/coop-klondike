@@ -266,8 +266,10 @@ void main() {
       // Recycle waste back to stock
       GameLogic.recycleWaste(gameState);
 
-      expect(gameState.stock.length, 24, reason: 'Stock should have 24 cards after recycling');
-      expect(gameState.waste.length, 0, reason: 'Waste should be empty after recycling');
+      // After recycling with auto-draw, some cards will be in waste
+      // In DrawMode.three, 3 cards are drawn from stock to waste
+      expect(gameState.stock.length, 21, reason: 'Stock should have 21 cards after recycling and auto-draw');
+      expect(gameState.waste.length, 3, reason: 'Waste should have 3 cards after auto-draw');
 
       // Collect all cards after recycling
       final afterRecycleAllCards = <Card>[];
@@ -323,10 +325,11 @@ void main() {
 
         GameLogic.recycleWaste(gameState);
 
-        expect(gameState.stock.length, 24,
-            reason: 'Stock should be refilled after recycling in cycle ${cycle + 1}');
-        expect(gameState.waste.length, 0,
-            reason: 'Waste should be empty after recycling in cycle ${cycle + 1}');
+        // After recycling with auto-draw, stock has 21 cards (24 - 3) and waste has 3
+        expect(gameState.stock.length, 21,
+            reason: 'Stock should have 21 cards after recycling and auto-draw in cycle ${cycle + 1}');
+        expect(gameState.waste.length, 3,
+            reason: 'Waste should have 3 cards after auto-draw in cycle ${cycle + 1}');
         expect(checkIntegrity(), isTrue,
             reason: 'Integrity should hold after recycling in cycle ${cycle + 1}');
       }

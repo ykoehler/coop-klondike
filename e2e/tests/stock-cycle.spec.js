@@ -198,6 +198,11 @@ test.describe('Stock cycling preserves order', () => {
         modeKey: mode.modeKey,
       });
 
+      // Capture initial waste state (from initial deal)
+      const initialWaste = await page.evaluate(async () => {
+        return await window.testHooks.getWasteSnapshot();
+      });
+
       const initialStockCount = await getStockCount(page);
       expect(initialStockCount).toBe(mode.initialStock);
 
@@ -227,9 +232,11 @@ test.describe('Stock cycling preserves order', () => {
       const totalCardsInSecondCycle = secondCycle.reduce((sum, cards) => sum + cards.length, 0);
       expect(totalCardsInSecondCycle).toBe(totalFirstCycleCards);
 
-      // Verify order is preserved: Combine waste (auto-drawn) + second cycle draws to match first cycle draws
+      // Verify order is preserved: Combine waste (auto-drawn) + second cycle draws to match initial waste + first cycle draws
+      // After recycle, waste contains: initial waste cards + auto-drawn cards
+      // We need to compare against: initial waste + first cycle cards
       const allSecondCycleCards = [...wasteAfterRecycle, ...secondCycle.flat()];
-      const allFirstCycleCards = firstCycle.flat();
+      const allFirstCycleCards = [...initialWaste, ...firstCycle.flat()];
       
       expect(allSecondCycleCards).toEqual(allFirstCycleCards);
     });

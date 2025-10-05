@@ -84,8 +84,9 @@ test.describe('Basic Game Load Tests', () => {
       waste: window.testHooks.getWasteCount(),
     }));
 
+    // After recycling with auto-draw in DrawMode.three, stock should have (total - 3) and waste should have 3
     expect(postRecycle.stock).toBeGreaterThan(0);
-    expect(postRecycle.waste).toBe(0);
+    expect(postRecycle.waste).toBe(3);
 
     const integrity = await page.evaluate(() => window.testHooks.validateCardIntegrity());
     expect(integrity.valid).toBe(true);

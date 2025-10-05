@@ -130,6 +130,10 @@ void main() {
     });
 
     test('cannot move invalid tableau to foundation', () {
+      // Ensure tableau[0] has a non-ace card (not valid for foundation)
+      state.tableau[0].cards.clear();
+      state.tableau[0].addCard(Card(suit: Suit.hearts, rank: Rank.king, faceUp: true));
+      
       expect(GameLogic.canMoveTableauToFoundation(state, 0, 0), false); // Not ace
     });
 
@@ -238,14 +242,16 @@ void main() {
 
       GameLogic.recycleWaste(state);
 
-      expect(state.waste.isEmpty, true);
-      expect(state.stock.length, 3);
+      // After recycling with auto-draw enabled, waste should have drawn cards
+      // In DrawMode.three, waste should have 3 cards (all stock cards were drawn)
+      expect(state.waste.length, 3);
+      expect(state.stock.length, 0);
 
-      // After recycling with reversal, cards come out in the same order they went in
-      // (preserving the visual stack order from the waste pile)
-      expect(state.stock.drawCard(), card1);
-      expect(state.stock.drawCard(), card2);
-      expect(state.stock.drawCard(), card3);
+      // After recycling with reversal and auto-draw, the cards are now in waste
+      // They should be in reverse order: card3, card2, card1 (top to bottom of waste)
+      expect(state.waste[2], card3);
+      expect(state.waste[1], card2);
+      expect(state.waste[0], card1);
     });
 
     test('recycleWaste does nothing when cannot recycle', () {
