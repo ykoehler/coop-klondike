@@ -27,10 +27,8 @@ jobs:
         with:
           flutter-version: '3.35.4'
           channel: 'stable'
-      - run: flutter config --enable-web
-      - run: flutter pub get
-      - name: Build Flutter web app
-        run: flutter build web --release
+      - name: Build Flutter web app with versioned assets
+        run: chmod +x build_versioned.sh && ./build_versioned.sh
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -68,7 +66,8 @@ jobs:
           channel: 'stable'
       - run: flutter config --enable-web
       - run: flutter pub get
-      - run: flutter build web --release
+      - name: Build Flutter web app with versioned assets
+        run: chmod +x build_versioned.sh && ./build_versioned.sh
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
