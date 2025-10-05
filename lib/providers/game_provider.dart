@@ -574,6 +574,7 @@ class GameProvider extends ChangeNotifier {
   Future<void> changeDrawMode(DrawMode newMode) async {
     if (await acquireLock('changeDrawMode')) {
       _currentDrawMode = newMode;
+      _gameState!.drawMode = newMode;  // Also update the game state's draw mode
       await _updateGameState();
       await releaseLock();
       if (_mounted) {

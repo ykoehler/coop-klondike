@@ -60,13 +60,16 @@ void registerTestHooksImpl(GameProvider provider) {
       print('TEST HOOKS: After first waitForIdle, isInit=${provider.isInitializing}');
       
       final targetMode = drawMode == 'one' ? DrawMode.one : DrawMode.three;
-      if (provider.drawMode != targetMode) {
-        await provider.changeDrawMode(targetMode);
-      }
+      
+      // Change the draw mode first (this updates _currentDrawMode)
+      await provider.changeDrawMode(targetMode);
+      await waitForIdle();
+      
+      // Now redeal with the new mode already set
       if (seed.isNotEmpty) {
         await provider.redealWithSeed(seed);
+        await waitForIdle();
       }
-      await provider.setupInitialGameState();
       
       // Mark setup as complete to prevent the dialog from showing
       provider.markSetupComplete();
@@ -75,7 +78,7 @@ void registerTestHooksImpl(GameProvider provider) {
       // Wait for any pending actions to complete
       print('TEST HOOKS: Waiting for idle after config...');
       await waitForIdle();
-      print('TEST HOOKS: Done! isInit=${provider.isInitializing}, isSetup=${provider.isInitialSetup}');
+      print('TEST HOOKS: Done! isInit=${provider.isInitializing}, isSetup=${provider.isInitialSetup}, mode=${provider.gameState.drawMode}');
     } catch (e) {
       print('TEST HOOKS ERROR: $e');
       rethrow;
@@ -173,6 +176,74 @@ void registerTestHooksImpl(GameProvider provider) {
   }
 
   js_util.setProperty(hooks, 'tapStock', js_util.allowInterop(() => _futureToPromise(tapStock())));
+
+  // Get tableau column information for testing
+  js_util.setProperty(hooks, 'getTableauColumn', js_util.allowInterop((int columnIndex) {
+    if (columnIndex < 0 || columnIndex >= provider.gameState.tableau.length) {
+      return null;
+    }
+    final column = provider.gameState.tableau[columnIndex];
+    return js_util.jsify(
+      column.cards.map((card) {
+        return <String, dynamic>{
+          'suit': card.suit.name,
+          'rank': card.rank.name,
+          'faceUp': card.faceUp,
+        };
+      }).toList(),
+    );
+  }));
+
+  // Move tableau to tableau for testing
+  Future<String> moveTableauToTableau(int fromIndex, int toIndex, int cardCount) async {
+    try {
+      await waitForIdle();
+      
+      if (fromIndex < 0 || fromIndex >= 7 || toIndex < 0 || toIndex >= 7) {
+        return 'invalid-indices';
+      }
+      
+      await provider.moveTableauToTableau(fromIndex, toIndex, cardCount);
+      await waitForIdle();
+      
+      return 'success';
+    } catch (e) {
+      print('MOVE TABLEAU ERROR: $e');
+      return 'error: $e';
+    }
+  }
+
+  js_util.setProperty(hooks, 'moveTableauToTableau', 
+    js_util.allowInterop((int from, int to, int count) => 
+      _futureToPromise(moveTableauToTableau(from, to, count))));
+
+  // Get all tableau state for debugging
+  js_util.setProperty(hooks, 'getTableauState', js_util.allowInterop(() {
+    return js_util.jsify(
+      List.generate(7, (i) {
+        final column = provider.gameState.tableau[i];
+        final topCardMap = column.topCard != null ? <String, dynamic>{
+          'suit': column.topCard!.suit.name,
+          'rank': column.topCard!.rank.name,
+          'faceUp': column.topCard!.faceUp,
+        } : null;
+        
+        return <String, dynamic>{
+          'index': i,
+          'cardCount': column.cards.length,
+          'isEmpty': column.isEmpty,
+          'topCard': topCardMap,
+          'cards': column.cards.map((card) {
+            return <String, dynamic>{
+              'suit': card.suit.name,
+              'rank': card.rank.name,
+              'faceUp': card.faceUp,
+            };
+          }).toList(),
+        };
+      }),
+    );
+  }));
 
   js_util.setProperty(js_util.globalThis, 'testHooks', hooks);
   js_util.setProperty(js_util.globalThis, 'testHooksReady', true);

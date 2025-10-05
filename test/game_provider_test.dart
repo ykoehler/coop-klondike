@@ -185,8 +185,11 @@ void main() {
 
         await provider.recycleWaste();
 
-        expect(provider.gameState.waste.isEmpty, true);
-        expect(provider.gameState.stock.length, wasteCount);
+        // After recycle, an auto-draw occurs so waste is not empty
+        final drawMode = provider.gameState.drawMode;
+        final expectedWasteCount = drawMode == DrawMode.one ? 1 : 3;
+        expect(provider.gameState.waste.length, expectedWasteCount);
+        expect(provider.gameState.stock.length, wasteCount - expectedWasteCount);
       },
     );
 
@@ -238,14 +241,26 @@ void main() {
 
       await provider.recycleWaste();
 
-      expect(provider.gameState.waste.isEmpty, true);
+      // After recycle, an auto-draw occurs so waste is not empty
+      final drawMode = provider.gameState.drawMode;
+      final expectedWasteCount = drawMode == DrawMode.one ? 1 : 3;
+      expect(provider.gameState.waste.length, expectedWasteCount);
+      
+      // Get the auto-drawn cards
+      final autoDrawnCards = List<Card>.from(provider.gameState.waste);
+      
+      // Draw the remaining cards from stock
       final recovered = <Card>[];
-      for (int i = 0; i < wasteSnapshot.length; i++) {
+      while (!provider.gameState.stock.isEmpty) {
         recovered.add(provider.gameState.stock.drawCard()!);
       }
+      
+      // Combine auto-drawn cards with manually drawn cards
+      final allRecovered = [...autoDrawnCards, ...recovered];
+      
       // After recycling with reversal, cards come out in the same order they were in waste
       // This preserves the visual stack order for consistent cycling
-      expect(recovered, wasteSnapshot.toList());
+      expect(allRecovered, wasteSnapshot.toList());
     });
 
     test('recycleWaste notifies listeners on successful recycle', () async {

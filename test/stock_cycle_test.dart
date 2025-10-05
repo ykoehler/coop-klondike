@@ -29,13 +29,15 @@ void main() {
       expect(gameState.stock.length, 0);
       expect(gameState.waste.length, 24);
       
-      // Recycle the waste back to stock
+      // Recycle the waste back to stock (auto-draws 1 card to waste)
       GameLogic.recycleWaste(gameState);
-      expect(gameState.stock.length, 24);
-      expect(gameState.waste.length, 0);
+      expect(gameState.stock.length, 23); // 24 - 1 auto-draw
+      expect(gameState.waste.length, 1); // 1 auto-drawn card
       
-      // Second cycle: drain the stock again
+      // Second cycle: drain the stock again (start with the auto-drawn card)
       final secondCycle = <Card>[];
+      secondCycle.addAll(gameState.waste); // Add the auto-drawn card(s)
+      
       while (!gameState.stock.isEmpty) {
         final wasteBeforeCount = gameState.waste.length;
         GameLogic.drawCard(gameState, DrawMode.one);
@@ -81,13 +83,15 @@ void main() {
       expect(gameState.stock.length, 0);
       expect(gameState.waste.length, 24);
       
-      // Recycle the waste back to stock
+      // Recycle the waste back to stock (auto-draws 3 cards to waste)
       GameLogic.recycleWaste(gameState);
-      expect(gameState.stock.length, 24);
-      expect(gameState.waste.length, 0);
+      expect(gameState.stock.length, 21); // 24 - 3 auto-draw
+      expect(gameState.waste.length, 3); // 3 auto-drawn cards
       
-      // Second cycle: flatten all drawn cards
+      // Second cycle: flatten all drawn cards (start with the auto-drawn cards)
       final secondCycleFlat = <Card>[];
+      secondCycleFlat.addAll(gameState.waste); // Add the auto-drawn cards
+      
       while (!gameState.stock.isEmpty) {
         final wasteBeforeCount = gameState.waste.length;
         GameLogic.drawCard(gameState, DrawMode.three);
@@ -128,6 +132,8 @@ void main() {
         GameLogic.recycleWaste(gameState);
         
         final currentCycle = <Card>[];
+        currentCycle.addAll(gameState.waste); // Add the auto-drawn card(s)
+        
         while (!gameState.stock.isEmpty) {
           final wasteBeforeCount = gameState.waste.length;
           GameLogic.drawCard(gameState, DrawMode.one);

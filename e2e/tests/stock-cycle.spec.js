@@ -6,8 +6,9 @@ const DRAW_MODES = [
     seed: 'e2e-draw-one-seed',
     modeKey: 'one',
     handSize: 1,
+    initialStock: 23, // 52 - 28 (tableau) - 1 (initial draw)
     expectation: {
-      clicks: 24,
+      clicks: 23,
     },
   },
   {
@@ -15,8 +16,9 @@ const DRAW_MODES = [
     seed: 'e2e-draw-three-seed',
     modeKey: 'three',
     handSize: 3,
+    initialStock: 21, // 52 - 28 (tableau) - 3 (initial draw)
     expectation: {
-      clicks: 8,
+      clicks: 7,
     },
   },
 ];
@@ -140,7 +142,7 @@ async function drainStock(page) {
   return draws;
 }
 
-async function recycleStock(page) {
+async function recycleStock(page, handSize) {
   // Capture snapshots and perform recycle in one evaluation
   const result = await page.evaluate(async () => {
     const stockBefore = await window.testHooks.getStockSnapshot();
@@ -163,11 +165,17 @@ async function recycleStock(page) {
     throw new Error(`Expected recycle action but received: ${result.action}`);
   }
 
+  // After recycle, stock should have cards (all waste cards minus what was auto-drawn)
   expect(result.stockAfter.length).toBeGreaterThan(0);
-  expect(result.wasteAfter.length).toBe(0);
+  // Waste should have cards from the auto-draw (not empty)
+  expect(result.wasteAfter.length).toBeGreaterThan(0);
+  expect(result.wasteAfter.length).toBeLessThanOrEqual(handSize);
+  
+  // Stock + waste should equal the total we had in waste before
+  expect(result.stockAfter.length + result.wasteAfter.length).toBe(result.wasteBefore.length);
 }
 
-function expectValidCycle(draws, handSize) {
+function expectValidCycle(draws, handSize, expectedTotal) {
   const totalCards = draws.reduce((sum, cards) => {
     expect(Array.isArray(cards)).toBeTruthy();
     expect(cards.length).toBeGreaterThan(0);
@@ -175,7 +183,7 @@ function expectValidCycle(draws, handSize) {
     return sum + cards.length;
   }, 0);
 
-  expect(totalCards).toBe(24);
+  expect(totalCards).toBe(expectedTotal);
 }
 
 test.describe('Stock cycling preserves order', () => {
@@ -191,22 +199,39 @@ test.describe('Stock cycling preserves order', () => {
       });
 
       const initialStockCount = await getStockCount(page);
-      expect(initialStockCount).toBe(24);
+      expect(initialStockCount).toBe(mode.initialStock);
 
       const firstCycle = await drainStock(page);
       expect(firstCycle.length).toBe(mode.expectation.clicks);
-      expectValidCycle(firstCycle, mode.handSize);
+      
+      // drainStock only drains from stock, so it returns mode.initialStock cards
+      const totalFirstCycleCards = firstCycle.reduce((sum, cards) => sum + cards.length, 0);
+      expect(totalFirstCycleCards).toBe(mode.initialStock);
 
       const stockAfterFirstCycle = await getStockCount(page);
       expect(stockAfterFirstCycle).toBe(0);
 
-      await recycleStock(page);
+      // After recycling, some cards will be auto-drawn to waste
+      await recycleStock(page, mode.handSize);
 
+      // Get the cards that were auto-drawn during recycle
+      const wasteAfterRecycle = await page.evaluate(async () => {
+        return await window.testHooks.getWasteSnapshot();
+      });
+
+      // Drain the stock again - this will do the same number of clicks as before
       const secondCycle = await drainStock(page);
       expect(secondCycle.length).toBe(mode.expectation.clicks);
-      expectValidCycle(secondCycle, mode.handSize);
+      
+      // Total cards in second cycle should equal total cards from first cycle (both drain just the stock)
+      const totalCardsInSecondCycle = secondCycle.reduce((sum, cards) => sum + cards.length, 0);
+      expect(totalCardsInSecondCycle).toBe(totalFirstCycleCards);
 
-      expect(secondCycle).toEqual(firstCycle);
+      // Verify order is preserved: Combine waste (auto-drawn) + second cycle draws to match first cycle draws
+      const allSecondCycleCards = [...wasteAfterRecycle, ...secondCycle.flat()];
+      const allFirstCycleCards = firstCycle.flat();
+      
+      expect(allSecondCycleCards).toEqual(allFirstCycleCards);
     });
   }
 });

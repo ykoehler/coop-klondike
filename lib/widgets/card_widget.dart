@@ -74,9 +74,14 @@ class _CardWidgetState extends State<CardWidget> {
     
     if (widget.draggable && widget.card.faceUp && !provider.isLocked && !provider.hasPendingAction) {
       Widget feedbackWidget = cardContent;
-      if (widget.column != null && widget.cardIndex != null) {
+      // Capture column and cardIndex early to avoid null issues during drag
+      final column = widget.column;
+      final cardIndex = widget.cardIndex;
+      
+      if (column != null && cardIndex != null && cardIndex < column.cards.length) {
         // Show the sub-stack
-        final subStack = widget.column!.cards.sublist(widget.cardIndex!);
+        // Create a defensive copy of the substack to avoid issues if column changes during drag
+        final subStack = List<card_model.Card>.from(column.cards.sublist(cardIndex));
         feedbackWidget = SizedBox(
           width: cardWidth,
           height: cardHeight + (subStack.length - 1) * tableauSpacing,
