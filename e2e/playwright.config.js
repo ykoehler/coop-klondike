@@ -69,11 +69,11 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npx http-server ../build/web -p 8080 -c-1',
-    url: 'http://127.0.0.1:8080',
-    reuseExistingServer: !process.env.CI,
-    cwd: __dirname,
-  },
+  /* Web server is started manually in GitHub Actions workflow */
+  // webServer: {
+  //   command: 'npx http-server ../build/web -p 8080 -c-1',
+  //   url: 'http://127.0.0.1:8080',
+  //   reuseExistingServer: !process.env.CI,
+  //   cwd: __dirname,
+  // },
 });
