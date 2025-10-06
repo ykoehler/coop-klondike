@@ -49,6 +49,9 @@ coverage/
 # Test results
 test-results/
 
+# E2E test screenshots (debugging artifacts)
+*.png
+
 # Web related
 
 # Exceptions to above rules.

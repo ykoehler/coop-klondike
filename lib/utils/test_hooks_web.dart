@@ -25,7 +25,7 @@ void registerTestHooksImpl(GameProvider provider) {
     print('waitForIdle: completed! isInit=${provider.isInitializing}, hasPending=${provider.hasPendingAction}');
   }
 
-  Object _futureToPromise<T>(Future<T> future) {
+  Object futureToPromise<T>(Future<T> future) {
     final promiseConstructor = js_util.getProperty(js_util.globalThis, 'Promise');
     return js_util.callConstructor(promiseConstructor, [
       js_util.allowInterop((resolve, reject) {
@@ -37,17 +37,17 @@ void registerTestHooksImpl(GameProvider provider) {
     ]);
   }
 
-  String _cardSignature(model.Card card) => '${card.rank.name}-${card.suit.name}';
+  String cardSignature(model.Card card) => '${card.rank.name}-${card.suit.name}';
 
   List<String> stockSnapshot() => provider.gameState.stock.cards
-      .map(_cardSignature)
+      .map(cardSignature)
       .toList(growable: false);
 
   List<String> wasteSnapshot() => provider.gameState.waste
-      .map(_cardSignature)
+      .map(cardSignature)
       .toList(growable: false);
 
-  js_util.setProperty(hooks, 'waitForIdle', js_util.allowInterop(() => _futureToPromise(waitForIdle())));
+  js_util.setProperty(hooks, 'waitForIdle', js_util.allowInterop(() => futureToPromise(waitForIdle())));
 
   Future<void> configureGame(String seed, String drawMode) async {
     try {
@@ -85,7 +85,7 @@ void registerTestHooksImpl(GameProvider provider) {
     }
   }
 
-  js_util.setProperty(hooks, 'configureGame', js_util.allowInterop((String seed, String drawMode) => _futureToPromise(configureGame(seed, drawMode))));
+  js_util.setProperty(hooks, 'configureGame', js_util.allowInterop((String seed, String drawMode) => futureToPromise(configureGame(seed, drawMode))));
 
   js_util.setProperty(hooks, 'getStockSnapshot', js_util.allowInterop(() => js_util.jsify(stockSnapshot())));
 
@@ -175,7 +175,7 @@ void registerTestHooksImpl(GameProvider provider) {
     }
   }
 
-  js_util.setProperty(hooks, 'tapStock', js_util.allowInterop(() => _futureToPromise(tapStock())));
+  js_util.setProperty(hooks, 'tapStock', js_util.allowInterop(() => futureToPromise(tapStock())));
 
   // Get tableau column information for testing
   js_util.setProperty(hooks, 'getTableauColumn', js_util.allowInterop((int columnIndex) {
@@ -215,7 +215,7 @@ void registerTestHooksImpl(GameProvider provider) {
 
   js_util.setProperty(hooks, 'moveTableauToTableau', 
     js_util.allowInterop((int from, int to, int count) => 
-      _futureToPromise(moveTableauToTableau(from, to, count))));
+      futureToPromise(moveTableauToTableau(from, to, count))));
 
   // Get all tableau state for debugging
   js_util.setProperty(hooks, 'getTableauState', js_util.allowInterop(() {

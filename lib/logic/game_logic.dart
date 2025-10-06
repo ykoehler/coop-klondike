@@ -153,9 +153,13 @@ class GameLogic {
       // Log stock operation for debugging
       _logStockOperation(state, 'recycle', state.stock.length);
       
-      // After recycling, immediately draw so waste is never empty
-      debugPrint('  ♻️ LOGIC recycleWaste: Auto-drawing after recycle to keep waste non-empty');
-      drawCard(state, state.drawMode);
+      // After recycling, immediately draw so waste is never empty when stock has cards
+      if (state.stock.length > 0) {
+        debugPrint('  ♻️ LOGIC recycleWaste: Auto-drawing after recycle to keep waste non-empty');
+        drawCard(state, state.drawMode);
+      } else {
+        debugPrint('  ♻️ LOGIC recycleWaste: Stock is empty after recycle, skipping auto-draw');
+      }
     }
   }
 
