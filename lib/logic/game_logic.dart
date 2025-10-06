@@ -172,8 +172,9 @@ class GameLogic {
   static bool isGameStuck(GameState state) {
     if (isGameWon(state)) return false;
 
-    // Check if can draw from stock
+    // Check if can draw from stock or recycle waste
     if (canDrawCard(state, state.drawMode)) return false;
+    if (canRecycleWaste(state)) return false;
 
     // Check waste to tableau moves
     for (int i = 0; i < 7; i++) {
