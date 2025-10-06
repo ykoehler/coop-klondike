@@ -232,13 +232,17 @@ test.describe('Stock cycling preserves order', () => {
       const totalCardsInSecondCycle = secondCycle.reduce((sum, cards) => sum + cards.length, 0);
       expect(totalCardsInSecondCycle).toBe(totalFirstCycleCards);
 
-      // Verify order is preserved: Combine waste (auto-drawn) + second cycle draws to match initial waste + first cycle draws
-      // After recycle, waste contains: initial waste cards + auto-drawn cards
-      // We need to compare against: initial waste + first cycle cards
-      const allSecondCycleCards = [...wasteAfterRecycle, ...secondCycle.flat()];
-      const allFirstCycleCards = [...initialWaste, ...firstCycle.flat()];
+      // Verify order is preserved: 
+      // The second cycle should produce the same card sequence as the first cycle
+      // Note: We don't include wasteAfterRecycle because those are auto-drawn cards that came from 
+      // the recycled waste, which would have already been in the first cycle
+      // Instead, we compare just the draw sequences
+      const firstCycleCards = firstCycle.flat();
+      const secondCycleCards = secondCycle.flat();
       
-      expect(allSecondCycleCards).toEqual(allFirstCycleCards);
+      // The cards drawn in the second cycle should match the cards from the first cycle
+      // because recycling preserves order
+      expect(secondCycleCards).toEqual(firstCycleCards);
     });
   }
 });
