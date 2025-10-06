@@ -52,6 +52,9 @@ test-results/
 # E2E test screenshots (debugging artifacts)
 *.png
 
+# Backup files
+*.backup
+
 # Web related
 
 # Exceptions to above rules.
