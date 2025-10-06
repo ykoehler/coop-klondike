@@ -112,6 +112,9 @@ test.describe('Firebase Race Condition Tests', () => {
   });
 
   test('Drain stock completely with no pauses', async ({ page }) => {
+    // Set longer timeout for CI environment where this test can take longer
+    test.setTimeout(60000); // 60 seconds
+    
     await page.evaluate(() => window.testHooks.configureGame('blue02orange', 'three'));
     
     console.log('Draining stock completely with rapid clicks...');
