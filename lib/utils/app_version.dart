@@ -3,5 +3,5 @@
 library;
 
 class AppVersion {
-  static const String version = 'v251005203844';
+  static const String version = 'v251006163621';
 }

@@ -81,6 +81,7 @@ async function drainStock(page) {
     }
 
     // Capture snapshots and perform tap in one evaluation to avoid interop issues
+    // Add explicit timeout to prevent hanging
     const result = await page.evaluate(async () => {
       const stockBefore = await window.testHooks.getStockSnapshot();
       const wasteBefore = await window.testHooks.getWasteSnapshot();
@@ -95,7 +96,14 @@ async function drainStock(page) {
       const action = hasThenable ? await rawAction : rawAction;
       const finalType = typeof action;
       
-      await window.testHooks.waitForIdle();
+      // Wait for idle with explicit timeout handling
+      try {
+        await window.testHooks.waitForIdle();
+      } catch (e) {
+        console.error('waitForIdle failed:', e);
+        throw new Error(`waitForIdle timeout: ${e.message}`);
+      }
+      
       const stockAfter = await window.testHooks.getStockSnapshot();
       const wasteAfter = await window.testHooks.getWasteSnapshot();
 
@@ -111,6 +119,8 @@ async function drainStock(page) {
         stockAfter,
         wasteAfter,
       };
+    }).catch((error) => {
+      throw new Error(`page.evaluate failed at draw ${safetyCounter}: ${error.message}`);
     });
 
     if (draws.length === 0) {
@@ -218,6 +228,12 @@ test.describe('Stock cycling preserves order', () => {
 
       // After recycling, some cards will be auto-drawn to waste
       await recycleStock(page, mode.handSize);
+
+      // Wait for the app to fully settle after recycling before continuing
+      await waitForIdle(page);
+      
+      // Add a small delay to ensure all state updates are complete
+      await page.waitForTimeout(100);
 
       // Get the cards that were auto-drawn during recycle
       const wasteAfterRecycle = await page.evaluate(async () => {
