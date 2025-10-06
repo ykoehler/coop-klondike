@@ -49,11 +49,22 @@ class GameState {
       final tableauRaw = json['tableau'];
       if (tableauRaw != null) {
         final tableauList = normalizeMapList(tableauRaw);
-        gameState.tableau = tableauList
+        final deserializedColumns = tableauList
             .map(
               (column) => TableauColumn.fromJson(column),
             )
             .toList();
+        
+        // Always ensure we have exactly 7 tableau columns
+        // If deserialized data has fewer, fill with empty columns
+        // If it has more, only take the first 7
+        gameState.tableau = List.generate(7, (index) {
+          if (index < deserializedColumns.length) {
+            return deserializedColumns[index];
+          } else {
+            return TableauColumn();
+          }
+        });
       }
 
       final foundationsData = json['foundations'];

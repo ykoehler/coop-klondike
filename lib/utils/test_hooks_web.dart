@@ -25,7 +25,7 @@ void registerTestHooksImpl(GameProvider provider) {
     print('waitForIdle: completed! isInit=${provider.isInitializing}, hasPending=${provider.hasPendingAction}');
   }
 
-  Object _futureToPromise<T>(Future<T> future) {
+  Object futureToPromise<T>(Future<T> future) {
     final promiseConstructor = js_util.getProperty(js_util.globalThis, 'Promise');
     return js_util.callConstructor(promiseConstructor, [
       js_util.allowInterop((resolve, reject) {
@@ -37,17 +37,17 @@ void registerTestHooksImpl(GameProvider provider) {
     ]);
   }
 
-  String _cardSignature(model.Card card) => '${card.rank.name}-${card.suit.name}';
+  String cardSignature(model.Card card) => '${card.rank.name}-${card.suit.name}';
 
   List<String> stockSnapshot() => provider.gameState.stock.cards
-      .map(_cardSignature)
+      .map(cardSignature)
       .toList(growable: false);
 
   List<String> wasteSnapshot() => provider.gameState.waste
-      .map(_cardSignature)
+      .map(cardSignature)
       .toList(growable: false);
 
-  js_util.setProperty(hooks, 'waitForIdle', js_util.allowInterop(() => _futureToPromise(waitForIdle())));
+  js_util.setProperty(hooks, 'waitForIdle', js_util.allowInterop(() => futureToPromise(waitForIdle())));
 
   Future<void> configureGame(String seed, String drawMode) async {
     try {
@@ -85,7 +85,7 @@ void registerTestHooksImpl(GameProvider provider) {
     }
   }
 
-  js_util.setProperty(hooks, 'configureGame', js_util.allowInterop((String seed, String drawMode) => _futureToPromise(configureGame(seed, drawMode))));
+  js_util.setProperty(hooks, 'configureGame', js_util.allowInterop((String seed, String drawMode) => futureToPromise(configureGame(seed, drawMode))));
 
   js_util.setProperty(hooks, 'getStockSnapshot', js_util.allowInterop(() => js_util.jsify(stockSnapshot())));
 
@@ -175,7 +175,7 @@ void registerTestHooksImpl(GameProvider provider) {
     }
   }
 
-  js_util.setProperty(hooks, 'tapStock', js_util.allowInterop(() => _futureToPromise(tapStock())));
+  js_util.setProperty(hooks, 'tapStock', js_util.allowInterop(() => futureToPromise(tapStock())));
 
   // Get tableau column information for testing
   js_util.setProperty(hooks, 'getTableauColumn', js_util.allowInterop((int columnIndex) {
@@ -215,7 +215,7 @@ void registerTestHooksImpl(GameProvider provider) {
 
   js_util.setProperty(hooks, 'moveTableauToTableau', 
     js_util.allowInterop((int from, int to, int count) => 
-      _futureToPromise(moveTableauToTableau(from, to, count))));
+      futureToPromise(moveTableauToTableau(from, to, count))));
 
   // Get all tableau state for debugging
   js_util.setProperty(hooks, 'getTableauState', js_util.allowInterop(() {
@@ -244,6 +244,140 @@ void registerTestHooksImpl(GameProvider provider) {
       }),
     );
   }));
+
+  // Expose the provider for advanced testing
+  js_util.setProperty(hooks, '_provider', provider);
+  
+  // Expose Card constructor for testing
+  js_util.setProperty(hooks, '_cardConstructor', js_util.allowInterop(
+    ({required model.Suit suit, required model.Rank rank}) => model.Card(suit: suit, rank: rank)
+  ));
+  
+  // Expose Suit enum
+  final suitEnum = js_util.newObject();
+  js_util.setProperty(suitEnum, 'hearts', model.Suit.hearts);
+  js_util.setProperty(suitEnum, 'diamonds', model.Suit.diamonds);
+  js_util.setProperty(suitEnum, 'clubs', model.Suit.clubs);
+  js_util.setProperty(suitEnum, 'spades', model.Suit.spades);
+  js_util.setProperty(hooks, '_suitEnum', suitEnum);
+  
+  // Expose Rank enum
+  final rankEnum = js_util.newObject();
+  js_util.setProperty(rankEnum, 'ace', model.Rank.ace);
+  js_util.setProperty(rankEnum, 'two', model.Rank.two);
+  js_util.setProperty(rankEnum, 'three', model.Rank.three);
+  js_util.setProperty(rankEnum, 'four', model.Rank.four);
+  js_util.setProperty(rankEnum, 'five', model.Rank.five);
+  js_util.setProperty(rankEnum, 'six', model.Rank.six);
+  js_util.setProperty(rankEnum, 'seven', model.Rank.seven);
+  js_util.setProperty(rankEnum, 'eight', model.Rank.eight);
+  js_util.setProperty(rankEnum, 'nine', model.Rank.nine);
+  js_util.setProperty(rankEnum, 'ten', model.Rank.ten);
+  js_util.setProperty(rankEnum, 'jack', model.Rank.jack);
+  js_util.setProperty(rankEnum, 'queen', model.Rank.queen);
+  js_util.setProperty(rankEnum, 'king', model.Rank.king);
+  js_util.setProperty(hooks, '_rankEnum', rankEnum);
+  
+  // Expose GameState constructor for testing serialization
+  js_util.setProperty(hooks, '_gameStateConstructor', js_util.newObject());
+  js_util.setProperty(
+    js_util.getProperty(hooks, '_gameStateConstructor'),
+    'fromJson',
+    js_util.allowInterop((dynamic json) => GameState.fromJson(json))
+  );
+
+  // Add helper to clear a tableau column (for testing empty columns)
+  Future<void> clearTableauColumn(int columnIndex) async {
+    if (columnIndex >= 0 && columnIndex < provider.gameState.tableau.length) {
+      provider.gameState.tableau[columnIndex].cards.clear();
+      // Don't sync - that would reload from Firebase and reorder columns
+      // Instead, we'll rely on the caller to wait and check state
+    }
+  }
+  
+  js_util.setProperty(hooks, 'clearTableauColumn', 
+    js_util.allowInterop((int colIndex) => futureToPromise(clearTableauColumn(colIndex))));
+
+  // Test helper: Can a tableau column accept a specific card?
+  js_util.setProperty(hooks, 'canTableauAcceptCard', js_util.allowInterop((int columnIndex, String suit, String rank) {
+    if (columnIndex < 0 || columnIndex >= provider.gameState.tableau.length) {
+      return false;
+    }
+    
+    // Parse suit and rank
+    final cardSuit = model.Suit.values.firstWhere((s) => s.name == suit);
+    final cardRank = model.Rank.values.firstWhere((r) => r.name == rank);
+    
+    final testCard = model.Card(suit: cardSuit, rank: cardRank);
+    testCard.faceUp = true;
+    
+    return provider.gameState.tableau[columnIndex].canAcceptCard(testCard);
+  }));
+
+  // Test helper: Add a card to a tableau column
+  Future<void> addCardToTableau(int columnIndex, String suit, String rank) async {
+    if (columnIndex >= 0 && columnIndex < provider.gameState.tableau.length) {
+      final cardSuit = model.Suit.values.firstWhere((s) => s.name == suit);
+      final cardRank = model.Rank.values.firstWhere((r) => r.name == rank);
+      
+      final testCard = model.Card(suit: cardSuit, rank: cardRank);
+      testCard.faceUp = true;
+      
+      provider.gameState.tableau[columnIndex].addCard(testCard);
+    }
+  }
+  
+  js_util.setProperty(hooks, 'addCardToTableau', 
+    js_util.allowInterop((int colIndex, String suit, String rank) => futureToPromise(addCardToTableau(colIndex, suit, rank))));
+
+  // Test helper: Serialize game state to JSON
+  js_util.setProperty(hooks, 'serializeGameState', js_util.allowInterop(() {
+    return js_util.jsify(provider.gameState.toJson());
+  }));
+
+  // Test helper: Deserialize and compare game state
+  js_util.setProperty(hooks, 'deserializeGameState', js_util.allowInterop((dynamic jsonData) {
+    try {
+      // Convert JS object to Dart Map
+      final dartMap = jsonData as Map<String, dynamic>;
+      final gameState = GameState.fromJson(dartMap);
+      
+      final columns = <Map<String, dynamic>>[];
+      for (var i = 0; i < gameState.tableau.length; i++) {
+        final col = gameState.tableau[i];
+        columns.add({
+          'index': i,
+          'cardCount': col.cards.length,
+          'isEmpty': col.isEmpty,
+        });
+      }
+      
+      return js_util.jsify({
+        'columnCount': gameState.tableau.length,
+        'columns': columns,
+      });
+    } catch (e) {
+      print('Error deserializing game state: $e');
+      return js_util.jsify({
+        'error': e.toString(),
+        'columnCount': 0,
+        'columns': [],
+      });
+    }
+  }));
+
+  // Remove the getGameState helper as it causes serialization issues
+  // js_util.setProperty(hooks, 'getGameState', js_util.allowInterop(() {
+  //   return provider.gameState;
+  // }));
+
+  // Add sync helper for manual state synchronization (use with caution in tests)
+  Future<void> syncState() async {
+    await provider.sync();
+  }
+  
+  js_util.setProperty(hooks, 'sync', 
+    js_util.allowInterop(() => futureToPromise(syncState())));
 
   js_util.setProperty(js_util.globalThis, 'testHooks', hooks);
   js_util.setProperty(js_util.globalThis, 'testHooksReady', true);

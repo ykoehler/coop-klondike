@@ -113,39 +113,78 @@ class _CardWidgetState extends State<CardWidget> {
         ),
         child: cardContent,
         onDragStarted: () async {
-          // Capture RenderBox before async operation to avoid context issues
-          final RenderBox? box = context.findRenderObject() as RenderBox?;
-          if (box == null) {
-            return;
-          }
+          try {
+            // Capture RenderBox before async operation to avoid context issues
+            final RenderBox? box = mounted ? context.findRenderObject() as RenderBox? : null;
+            if (box == null || !mounted) {
+              return;
+            }
 
-          if (provider.hasPendingAction) {
-            return;
-          }
+            if (provider.hasPendingAction) {
+              return;
+            }
 
-          if (await provider.acquireLock('drag')) {
-            // Mark as dragging to prevent state updates during drag
-            _hasDragLock = true;
-            provider.setDragging(true);
-            // Start broadcasting drag position
-            final position = box.localToGlobal(Offset.zero);
-            provider.updateDragPosition(cardId, position.dx, position.dy);
+            if (await provider.acquireLock('drag')) {
+              // Mark as dragging to prevent state updates during drag
+              if (mounted) {
+                setState(() {
+                  _hasDragLock = true;
+                });
+                provider.setDragging(true);
+                // Start broadcasting drag position
+                final position = box.localToGlobal(Offset.zero);
+                provider.updateDragPosition(cardId, position.dx, position.dy);
+              } else {
+                // Widget was unmounted during lock acquisition, release the lock
+                await provider.releaseLock();
+              }
+            }
+          } catch (e) {
+            debugPrint('❌ Error in onDragStarted: $e');
+            // Ensure lock is released on error
+            if (_hasDragLock) {
+              provider.releaseLock();
+              if (mounted) {
+                setState(() {
+                  _hasDragLock = false;
+                });
+              }
+            }
           }
         },
         onDragEnd: (details) async {
-          // Stop broadcasting drag position
-          if (_hasDragLock) {
-            provider.updateDragPosition(cardId, 0, 0); // Reset position
-            await provider.releaseLock();
-            _hasDragLock = false;
+          try {
+            // Stop broadcasting drag position
+            if (_hasDragLock) {
+              provider.updateDragPosition(cardId, 0, 0); // Reset position
+              await provider.releaseLock();
+              if (mounted) {
+                setState(() {
+                  _hasDragLock = false;
+                });
+              }
+            }
+            // Mark drag as complete - this will apply any pending updates
+            provider.setDragging(false);
+          } catch (e) {
+            debugPrint('❌ Error in onDragEnd: $e');
+            // Ensure state is cleaned up even on error
+            if (mounted) {
+              setState(() {
+                _hasDragLock = false;
+              });
+            }
+            provider.setDragging(false);
           }
-          // Mark drag as complete - this will apply any pending updates
-          provider.setDragging(false);
         },
         onDragUpdate: (details) {
-          // Update drag position
-          if (_hasDragLock) {
-            provider.updateDragPosition(cardId, details.globalPosition.dx, details.globalPosition.dy);
+          try {
+            // Update drag position
+            if (_hasDragLock && mounted) {
+              provider.updateDragPosition(cardId, details.globalPosition.dx, details.globalPosition.dy);
+            }
+          } catch (e) {
+            debugPrint('❌ Error in onDragUpdate: $e');
           }
         },
       );
@@ -155,7 +194,7 @@ class _CardWidgetState extends State<CardWidget> {
   }
 
   Widget _buildCardContent(BuildContext context, double cardWidth, double cardHeight, double tableauSpacing) {
-    print('DEBUG: CardWidget _buildCardContent - card: ${widget.card}, faceUp: ${widget.card.faceUp}, dimensions: ${cardWidth}x${cardHeight}');
+    print('DEBUG: CardWidget _buildCardContent - card: ${widget.card}, faceUp: ${widget.card.faceUp}, dimensions: ${cardWidth}x$cardHeight');
     return Container(
       width: cardWidth,
       height: cardHeight,

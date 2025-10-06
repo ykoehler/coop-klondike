@@ -545,22 +545,34 @@ void main() {
         evacuateFoundationToStock(provider.gameState, 0);
         final foundation = provider.gameState.foundations[0];
         Card? kingHearts;
+        
+        // Search stock first
         try {
           kingHearts = extractCardFromStock(
             provider.gameState,
             (card) => card.rank == Rank.king && card.suit == Suit.hearts,
           );
         } on StateError {
-          for (final column in provider.gameState.tableau) {
-            final index = column.cards.indexWhere(
-              (card) => card.rank == Rank.king && card.suit == Suit.hearts,
-            );
-            if (index != -1) {
-              kingHearts = column.cards.removeAt(index);
-              break;
+          // Search waste pile
+          final wasteIndex = provider.gameState.waste.indexWhere(
+            (card) => card.rank == Rank.king && card.suit == Suit.hearts,
+          );
+          if (wasteIndex != -1) {
+            kingHearts = provider.gameState.waste.removeAt(wasteIndex);
+          } else {
+            // Search tableau (all cards, not just top ones)
+            for (final column in provider.gameState.tableau) {
+              final index = column.cards.indexWhere(
+                (card) => card.rank == Rank.king && card.suit == Suit.hearts,
+              );
+              if (index != -1) {
+                kingHearts = column.cards.removeAt(index);
+                break;
+              }
             }
           }
         }
+        
         kingHearts ??=
             (throw StateError('King of hearts not available for test setup'));
         kingHearts.faceUp = true;

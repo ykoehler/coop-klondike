@@ -584,7 +584,14 @@ class GameProvider extends ChangeNotifier {
   }
 
   Future<void> drawCard() async {
-    debugPrint('🎴 DRAW CARD: Starting (stock=${_gameState?.stock.length}, waste=${_gameState?.waste.length})');
+    debugPrint('🎴 DRAW CARD: Starting (stock=${_gameState?.stock.length}, waste=${_gameState?.waste.length}, pending=$_pendingActionCount)');
+    
+    // Early exit if there's already a pending action
+    if (_pendingActionCount > 0) {
+      debugPrint('🎴 DRAW CARD: Blocked - pending action in progress');
+      return;
+    }
+    
     _applyPendingStateIfAvailable();
     debugPrint('🎴 DRAW CARD: After pending apply (stock=${_gameState?.stock.length}, waste=${_gameState?.waste.length})');
     
@@ -606,7 +613,14 @@ class GameProvider extends ChangeNotifier {
   }
 
   Future<void> recycleWaste() async {
-    debugPrint('🔄 RECYCLE START: Applying pending state if available...');
+    debugPrint('🔄 RECYCLE START: Applying pending state if available... (pending=$_pendingActionCount)');
+    
+    // Early exit if there's already a pending action
+    if (_pendingActionCount > 0) {
+      debugPrint('🔄 RECYCLE: Blocked - pending action in progress');
+      return;
+    }
+    
     _applyPendingStateIfAvailable();
     debugPrint('🔄 RECYCLE: After applying pending (stock=${_gameState!.stock.length}, waste=${_gameState!.waste.length})');
     

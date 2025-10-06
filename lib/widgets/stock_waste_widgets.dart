@@ -15,19 +15,24 @@ class StockPileWidget extends StatelessWidget {
     final hasCards = !provider.gameState.stock.isEmpty;
     final cardWidth = context.cardWidth;
     final cardHeight = context.cardHeight;
+    // Disable interactions if there's a pending action OR if the game is locked
     final interactionsDisabled = provider.hasPendingAction || provider.isLocked;
 
     VoidCallback? onTap;
     if (!interactionsDisabled) {
       if (hasCards) {
         onTap = () {
+          debugPrint('🎴 STOCK TAP: Drawing card (stock=${provider.gameState.stock.length})');
           unawaited(provider.drawCard());
         };
       } else if (provider.gameState.waste.isNotEmpty) {
         onTap = () {
+          debugPrint('♻️ STOCK TAP: Recycling waste (waste=${provider.gameState.waste.length})');
           unawaited(provider.recycleWaste());
         };
       }
+    } else {
+      debugPrint('🚫 STOCK TAP: Interactions disabled (pending=${provider.hasPendingAction}, locked=${provider.isLocked})');
     }
 
     return GestureDetector(
@@ -36,7 +41,9 @@ class StockPileWidget extends StatelessWidget {
         width: cardWidth,
         height: cardHeight,
         decoration: BoxDecoration(
-          color: hasCards ? Colors.blue : Colors.grey[300],
+          color: interactionsDisabled 
+              ? Colors.grey[400]  // Visual feedback when disabled
+              : (hasCards ? Colors.blue : Colors.grey[300]),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.black, width: 1),
         ),
@@ -44,7 +51,9 @@ class StockPileWidget extends StatelessWidget {
           child: Text(
             hasCards ? 'Draw' : 'Empty',
             style: TextStyle(
-              color: hasCards ? Colors.white : Colors.grey[600],
+              color: interactionsDisabled
+                  ? Colors.grey[600]
+                  : (hasCards ? Colors.white : Colors.grey[600]),
               fontSize: context.cardFontSize,
               fontWeight: FontWeight.bold,
             ),
