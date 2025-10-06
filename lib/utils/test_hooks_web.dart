@@ -286,6 +286,99 @@ void registerTestHooksImpl(GameProvider provider) {
     js_util.allowInterop((dynamic json) => GameState.fromJson(json))
   );
 
+  // Add helper to clear a tableau column (for testing empty columns)
+  Future<void> clearTableauColumn(int columnIndex) async {
+    if (columnIndex >= 0 && columnIndex < provider.gameState.tableau.length) {
+      provider.gameState.tableau[columnIndex].cards.clear();
+      // Don't sync - that would reload from Firebase and reorder columns
+      // Instead, we'll rely on the caller to wait and check state
+    }
+  }
+  
+  js_util.setProperty(hooks, 'clearTableauColumn', 
+    js_util.allowInterop((int colIndex) => futureToPromise(clearTableauColumn(colIndex))));
+
+  // Test helper: Can a tableau column accept a specific card?
+  js_util.setProperty(hooks, 'canTableauAcceptCard', js_util.allowInterop((int columnIndex, String suit, String rank) {
+    if (columnIndex < 0 || columnIndex >= provider.gameState.tableau.length) {
+      return false;
+    }
+    
+    // Parse suit and rank
+    final cardSuit = model.Suit.values.firstWhere((s) => s.name == suit);
+    final cardRank = model.Rank.values.firstWhere((r) => r.name == rank);
+    
+    final testCard = model.Card(suit: cardSuit, rank: cardRank);
+    testCard.faceUp = true;
+    
+    return provider.gameState.tableau[columnIndex].canAcceptCard(testCard);
+  }));
+
+  // Test helper: Add a card to a tableau column
+  Future<void> addCardToTableau(int columnIndex, String suit, String rank) async {
+    if (columnIndex >= 0 && columnIndex < provider.gameState.tableau.length) {
+      final cardSuit = model.Suit.values.firstWhere((s) => s.name == suit);
+      final cardRank = model.Rank.values.firstWhere((r) => r.name == rank);
+      
+      final testCard = model.Card(suit: cardSuit, rank: cardRank);
+      testCard.faceUp = true;
+      
+      provider.gameState.tableau[columnIndex].addCard(testCard);
+    }
+  }
+  
+  js_util.setProperty(hooks, 'addCardToTableau', 
+    js_util.allowInterop((int colIndex, String suit, String rank) => futureToPromise(addCardToTableau(colIndex, suit, rank))));
+
+  // Test helper: Serialize game state to JSON
+  js_util.setProperty(hooks, 'serializeGameState', js_util.allowInterop(() {
+    return js_util.jsify(provider.gameState.toJson());
+  }));
+
+  // Test helper: Deserialize and compare game state
+  js_util.setProperty(hooks, 'deserializeGameState', js_util.allowInterop((dynamic jsonData) {
+    try {
+      // Convert JS object to Dart Map
+      final dartMap = jsonData as Map<String, dynamic>;
+      final gameState = GameState.fromJson(dartMap);
+      
+      final columns = <Map<String, dynamic>>[];
+      for (var i = 0; i < gameState.tableau.length; i++) {
+        final col = gameState.tableau[i];
+        columns.add({
+          'index': i,
+          'cardCount': col.cards.length,
+          'isEmpty': col.isEmpty,
+        });
+      }
+      
+      return js_util.jsify({
+        'columnCount': gameState.tableau.length,
+        'columns': columns,
+      });
+    } catch (e) {
+      print('Error deserializing game state: $e');
+      return js_util.jsify({
+        'error': e.toString(),
+        'columnCount': 0,
+        'columns': [],
+      });
+    }
+  }));
+
+  // Remove the getGameState helper as it causes serialization issues
+  // js_util.setProperty(hooks, 'getGameState', js_util.allowInterop(() {
+  //   return provider.gameState;
+  // }));
+
+  // Add sync helper for manual state synchronization (use with caution in tests)
+  Future<void> syncState() async {
+    await provider.sync();
+  }
+  
+  js_util.setProperty(hooks, 'sync', 
+    js_util.allowInterop(() => futureToPromise(syncState())));
+
   js_util.setProperty(js_util.globalThis, 'testHooks', hooks);
   js_util.setProperty(js_util.globalThis, 'testHooksReady', true);
 }
