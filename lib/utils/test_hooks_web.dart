@@ -245,6 +245,47 @@ void registerTestHooksImpl(GameProvider provider) {
     );
   }));
 
+  // Expose the provider for advanced testing
+  js_util.setProperty(hooks, '_provider', provider);
+  
+  // Expose Card constructor for testing
+  js_util.setProperty(hooks, '_cardConstructor', js_util.allowInterop(
+    ({required model.Suit suit, required model.Rank rank}) => model.Card(suit: suit, rank: rank)
+  ));
+  
+  // Expose Suit enum
+  final suitEnum = js_util.newObject();
+  js_util.setProperty(suitEnum, 'hearts', model.Suit.hearts);
+  js_util.setProperty(suitEnum, 'diamonds', model.Suit.diamonds);
+  js_util.setProperty(suitEnum, 'clubs', model.Suit.clubs);
+  js_util.setProperty(suitEnum, 'spades', model.Suit.spades);
+  js_util.setProperty(hooks, '_suitEnum', suitEnum);
+  
+  // Expose Rank enum
+  final rankEnum = js_util.newObject();
+  js_util.setProperty(rankEnum, 'ace', model.Rank.ace);
+  js_util.setProperty(rankEnum, 'two', model.Rank.two);
+  js_util.setProperty(rankEnum, 'three', model.Rank.three);
+  js_util.setProperty(rankEnum, 'four', model.Rank.four);
+  js_util.setProperty(rankEnum, 'five', model.Rank.five);
+  js_util.setProperty(rankEnum, 'six', model.Rank.six);
+  js_util.setProperty(rankEnum, 'seven', model.Rank.seven);
+  js_util.setProperty(rankEnum, 'eight', model.Rank.eight);
+  js_util.setProperty(rankEnum, 'nine', model.Rank.nine);
+  js_util.setProperty(rankEnum, 'ten', model.Rank.ten);
+  js_util.setProperty(rankEnum, 'jack', model.Rank.jack);
+  js_util.setProperty(rankEnum, 'queen', model.Rank.queen);
+  js_util.setProperty(rankEnum, 'king', model.Rank.king);
+  js_util.setProperty(hooks, '_rankEnum', rankEnum);
+  
+  // Expose GameState constructor for testing serialization
+  js_util.setProperty(hooks, '_gameStateConstructor', js_util.newObject());
+  js_util.setProperty(
+    js_util.getProperty(hooks, '_gameStateConstructor'),
+    'fromJson',
+    js_util.allowInterop((dynamic json) => GameState.fromJson(json))
+  );
+
   js_util.setProperty(js_util.globalThis, 'testHooks', hooks);
   js_util.setProperty(js_util.globalThis, 'testHooksReady', true);
 }
