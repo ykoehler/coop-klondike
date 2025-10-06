@@ -71,7 +71,10 @@ async function drainStock(page) {
 
   while (true) {
     const stockCount = await getStockCount(page);
+    console.log(`drainStock iteration ${safetyCounter + 1}: stock has ${stockCount} cards`);
+    
     if (stockCount === 0) {
+      console.log(`drainStock complete: drained ${draws.length} times, total cards: ${draws.flat().length}`);
       break;
     }
 
@@ -80,46 +83,61 @@ async function drainStock(page) {
       throw new Error('Exceeded maximum draw operations while draining stock');
     }
 
+    // Before each draw, ensure the app is in a ready state
+    const debugState = await page.evaluate(() => window.testHooks.getDebugState());
+    if (debugState.hasPendingAction) {
+      console.log(`Warning: hasPendingAction=true before draw ${safetyCounter}, waiting...`);
+      await waitForIdle(page);
+    }
+
     // Capture snapshots and perform tap in one evaluation to avoid interop issues
     // Add explicit timeout to prevent hanging
-    const result = await page.evaluate(async () => {
-      const stockBefore = await window.testHooks.getStockSnapshot();
-      const wasteBefore = await window.testHooks.getWasteSnapshot();
-      
-      // Call tapStock and see what it returns
-      const rawAction = window.testHooks.tapStock();
-      const actionType = typeof rawAction;
-      const actionConstructor = rawAction && rawAction.constructor ? rawAction.constructor.name : 'null';
-      const hasThenable = rawAction && typeof rawAction.then === 'function';
-      
-      // If it's thenable, await it
-      const action = hasThenable ? await rawAction : rawAction;
-      const finalType = typeof action;
-      
-      // Wait for idle with explicit timeout handling
-      try {
-        await window.testHooks.waitForIdle();
-      } catch (e) {
-        console.error('waitForIdle failed:', e);
-        throw new Error(`waitForIdle timeout: ${e.message}`);
-      }
-      
-      const stockAfter = await window.testHooks.getStockSnapshot();
-      const wasteAfter = await window.testHooks.getWasteSnapshot();
+    console.log(`Attempting draw ${safetyCounter}...`);
+    
+    // Set a 20-second timeout for this evaluation (less than test timeout)
+    const result = await Promise.race([
+      page.evaluate(async () => {
+        const stockBefore = await window.testHooks.getStockSnapshot();
+        const wasteBefore = await window.testHooks.getWasteSnapshot();
+        
+        // Call tapStock and see what it returns
+        const rawAction = window.testHooks.tapStock();
+        const actionType = typeof rawAction;
+        const actionConstructor = rawAction && rawAction.constructor ? rawAction.constructor.name : 'null';
+        const hasThenable = rawAction && typeof rawAction.then === 'function';
+        
+        // If it's thenable, await it
+        const action = hasThenable ? await rawAction : rawAction;
+        const finalType = typeof action;
+        
+        // Wait for idle with explicit timeout handling
+        try {
+          await window.testHooks.waitForIdle();
+        } catch (e) {
+          console.error('waitForIdle failed:', e);
+          throw new Error(`waitForIdle timeout: ${e.message}`);
+        }
+        
+        const stockAfter = await window.testHooks.getStockSnapshot();
+        const wasteAfter = await window.testHooks.getWasteSnapshot();
 
-      return {
-        action,
-        actionType: finalType,
-        actionStringified: String(action),
-        rawActionType: actionType,
-        actionConstructor,
-        hasThenable,
-        stockBefore,
-        wasteBefore,
-        stockAfter,
-        wasteAfter,
-      };
-    }).catch((error) => {
+        return {
+          action,
+          actionType: finalType,
+          actionStringified: String(action),
+          rawActionType: actionType,
+          actionConstructor,
+          hasThenable,
+          stockBefore,
+          wasteBefore,
+          stockAfter,
+          wasteAfter,
+        };
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('page.evaluate timeout after 20s')), 20000)
+      )
+    ]).catch((error) => {
       throw new Error(`page.evaluate failed at draw ${safetyCounter}: ${error.message}`);
     });
 
@@ -233,7 +251,20 @@ test.describe('Stock cycling preserves order', () => {
       await waitForIdle(page);
       
       // Add a small delay to ensure all state updates are complete
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(500);
+
+      // Verify the app is in a good state before continuing
+      const debugState = await page.evaluate(async () => {
+        return await window.testHooks.getDebugState();
+      });
+      console.log('Debug state after recycle:', debugState);
+      
+      // If the app is locked or has pending actions, wait more
+      if (debugState.hasPendingAction || debugState.isLocked) {
+        console.log('App is locked/pending after recycle, waiting additional time...');
+        await page.waitForTimeout(1000);
+        await waitForIdle(page);
+      }
 
       // Get the cards that were auto-drawn during recycle
       const wasteAfterRecycle = await page.evaluate(async () => {
