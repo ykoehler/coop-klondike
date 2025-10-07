@@ -171,6 +171,7 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<GameProvider>(context);
     final isWon = provider.isGameWon;
+    final isStuck = provider.isGameStuck;
 
     return Scaffold(
       appBar: PreferredSize(
@@ -226,6 +227,36 @@ class _GameScreenState extends State<GameScreen> {
                           ElevatedButton(
                             onPressed: _showDrawModeDialog,
                             child: const Text('Play Again'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (isStuck && !isWon)
+              Container(
+                color: Colors.black54,
+                child: Center(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Game Over',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text('No more moves available!'),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: _showNewGameDialog,
+                            child: const Text('New Game'),
                           ),
                         ],
                       ),
