@@ -2,18 +2,31 @@ import 'card.dart';
 import '../utils/json_utils.dart';
 
 class TableauColumn {
-  List<Card> cards = [];
+  TableauColumn({this.columnIndex = 0, List<Card>? initialCards})
+      : cards = initialCards ?? [];
+
+  int columnIndex;
+  List<Card> cards;
 
   Map<String, dynamic> toJson() {
     final json = {
+      'columnIndex': columnIndex,
       'cards': cards.map((card) => card.toJson()).toList(),
     };
-    
+
     return json;
   }
 
-  static TableauColumn fromJson(Map<String, dynamic> json) {
-    final column = TableauColumn();
+  static TableauColumn fromJson(
+    Map<String, dynamic> json, {
+    required int fallbackIndex,
+  }) {
+    final inferredIndex = json['columnIndex'] ?? json['index'];
+    final columnIndex = inferredIndex is int
+        ? inferredIndex
+        : int.tryParse(inferredIndex?.toString() ?? '') ?? fallbackIndex;
+
+    final column = TableauColumn(columnIndex: columnIndex);
     if (json.containsKey('cards') && json['cards'] != null) {
       column.cards = normalizeMapList(json['cards'])
           .map((card) => Card.fromJson(card))

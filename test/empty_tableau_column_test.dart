@@ -108,6 +108,67 @@ void main() {
       }
     });
 
+    test('Column indices preserved when list entry missing', () {
+      final originalState = GameState(gameId: 'TEST-MISSING', seedStr: 'seed-missing');
+
+      // Clear out a middle column and capture original card identities for comparison
+      originalState.tableau[1].cards.clear();
+      final referenceColumnTwo = originalState.tableau[2]
+          .cards
+          .map((card) => '${card.suit.name}-${card.rank.name}-${card.faceUp}')
+          .toList();
+
+      final json = originalState.toJson();
+      final tableauList = List<Map<String, dynamic>>.from(json['tableau'] as List);
+
+      // Simulate data loss where Firebase drops the empty column entry entirely
+      tableauList.removeWhere((column) => column['columnIndex'] == 1);
+
+      final mutatedJson = Map<String, dynamic>.from(json);
+      mutatedJson['tableau'] = tableauList;
+
+      final restoredState = GameState.fromJson(mutatedJson);
+
+      expect(restoredState.tableau.length, 7);
+      expect(restoredState.tableau[1].columnIndex, 1);
+      expect(restoredState.tableau[1].cards, isEmpty);
+      expect(
+        restoredState.tableau[2]
+            .cards
+            .map((card) => '${card.suit.name}-${card.rank.name}-${card.faceUp}')
+            .toList(),
+        referenceColumnTwo,
+      );
+    });
+
+    test('Column indices preserved when sparse map used', () {
+      final state = GameState(gameId: 'TEST-SPARSE', seedStr: 'seed-sparse');
+      state.tableau[4].cards.clear();
+
+      final json = state.toJson();
+      final tableauEntries = (json['tableau'] as List)
+          .cast<Map<String, dynamic>>()
+          .where((column) => column['columnIndex'] != null)
+          .toList();
+
+      final sparseMap = <String, dynamic>{
+        for (final entry in tableauEntries)
+          if (entry['columnIndex'] != 4)
+            '${entry['columnIndex']}' : entry,
+      };
+
+      final mutatedJson = Map<String, dynamic>.from(json);
+      mutatedJson['tableau'] = sparseMap; // Missing key "4"
+
+      final restored = GameState.fromJson(mutatedJson);
+
+      expect(restored.tableau.length, 7);
+      expect(restored.tableau[4].columnIndex, 4);
+      expect(restored.tableau[4].cards, isEmpty);
+      expect(restored.tableau[3].columnIndex, 3);
+      expect(restored.tableau[5].columnIndex, 5);
+    });
+
     test('JSON with more than 7 columns should be trimmed', () {
       // Create JSON with 9 tableau columns
       final json = {

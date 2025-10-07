@@ -10,7 +10,10 @@ import 'package:flutter/foundation.dart';
 enum DrawMode { one, three }
 
 class GameState {
-  List<TableauColumn> tableau = List.generate(7, (_) => TableauColumn());
+  List<TableauColumn> tableau = List.generate(
+    7,
+    (index) => TableauColumn(columnIndex: index),
+  );
   List<FoundationPile> foundations = List.generate(4, (_) => FoundationPile());
   Deck stock = Deck();
   List<Card> waste = [];
@@ -20,8 +23,17 @@ class GameState {
   late String seed;
 
   Map<String, dynamic> toJson() {
+    final sortedTableau = [...tableau]
+      ..sort((a, b) => a.columnIndex.compareTo(b.columnIndex));
+
+    if (kDebugMode) {
+      debugPrint(
+        '🧩 GAMESTATE.toJson tableau order: ${sortedTableau.map((c) => c.columnIndex).join(", ")}',
+      );
+    }
+
     final json = {
-      'tableau': tableau.map((column) => column.toJson()).toList(),
+      'tableau': sortedTableau.map((column) => column.toJson()).toList(),
       'foundations': foundations.map((pile) => pile.toJson()).toList(),
       'stock': stock.toJson(),
       'waste': waste.map((card) => card.toJson()).toList(),
@@ -48,23 +60,48 @@ class GameState {
     try {
       final tableauRaw = json['tableau'];
       if (tableauRaw != null) {
-        final tableauList = normalizeMapList(tableauRaw);
-        final deserializedColumns = tableauList
-            .map(
-              (column) => TableauColumn.fromJson(column),
-            )
-            .toList();
-        
-        // Always ensure we have exactly 7 tableau columns
-        // If deserialized data has fewer, fill with empty columns
-        // If it has more, only take the first 7
-        gameState.tableau = List.generate(7, (index) {
-          if (index < deserializedColumns.length) {
-            return deserializedColumns[index];
-          } else {
-            return TableauColumn();
+        final parsedColumns = <int, TableauColumn>{};
+
+        if (tableauRaw is List) {
+          for (var i = 0; i < tableauRaw.length; i++) {
+            final entry = tableauRaw[i];
+            if (entry is Map) {
+              final column = TableauColumn.fromJson(
+                Map<String, dynamic>.from(entry),
+                fallbackIndex: i,
+              );
+              parsedColumns[column.columnIndex] = column;
+            }
           }
+        } else if (tableauRaw is Map) {
+          tableauRaw.forEach((key, value) {
+            if (value is Map) {
+              final fallbackIndex = int.tryParse(key.toString()) ?? 0;
+              final column = TableauColumn.fromJson(
+                Map<String, dynamic>.from(value),
+                fallbackIndex: fallbackIndex,
+              );
+              parsedColumns[column.columnIndex] = column;
+            }
+          });
+        }
+
+        gameState.tableau = List.generate(7, (index) {
+          final column = parsedColumns[index] ?? TableauColumn(columnIndex: index);
+          column.columnIndex = index;
+          return column;
         });
+      } else {
+        gameState.tableau = List.generate(
+          7,
+          (index) => TableauColumn(columnIndex: index),
+        );
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+          '🧩 GAMESTATE.fromJson tableau order: ${gameState.tableau.map((c) => c.columnIndex).join(", ")}',
+        );
       }
 
       final foundationsData = json['foundations'];
@@ -161,7 +198,7 @@ class GameState {
   void _dealNewGame({String? seed}) {
     stock.reset(seed: seed);
     waste.clear();
-    tableau = List.generate(7, (_) => TableauColumn());
+  tableau = List.generate(7, (index) => TableauColumn(columnIndex: index));
     foundations = List.generate(4, (_) => FoundationPile());
 
     // Deal to tableau
