@@ -156,7 +156,8 @@ class _CardWidgetState extends State<CardWidget> {
           try {
             // Stop broadcasting drag position
             if (_hasDragLock) {
-              provider.updateDragPosition(cardId, 0, 0); // Reset position
+              // CRITICAL: Await this to ensure Firebase is updated before releasing lock
+              await provider.updateDragPosition(cardId, 0, 0); // Reset position
               await provider.releaseLock();
               if (mounted) {
                 setState(() {
