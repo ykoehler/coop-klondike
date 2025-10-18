@@ -3,6 +3,15 @@ import 'card.dart';
 import '../utils/json_utils.dart';
 import 'package:flutter/foundation.dart';
 
+/// Represents the stock pile in Klondike Solitaire.
+/// 
+/// The deck manages a collection of cards that can be:
+/// - Shuffled (with optional seed for reproducible shuffles)
+/// - Drawn one at a time
+/// - Recycled from waste back to stock
+/// 
+/// For multiplayer games, the same seed ensures all players initialize
+/// with the same card order, enabling consistent and fair gameplay.
 class Deck {
   List<Card> _cards = [];
 
@@ -25,13 +34,15 @@ class Deck {
     return deck;
   }
 
-  // Private constructor for deserialization that doesn't initialize cards
+  /// Private constructor for deserialization that doesn't initialize cards
   Deck._empty();
 
+  /// Creates a new shuffled deck with all 52 cards.
   Deck() {
     _initializeDeck();
   }
 
+  /// Initializes the deck with all 52 unique cards (4 suits × 13 ranks).
   void _initializeDeck() {
     _cards = [];
     for (var suit in Suit.values) {
@@ -41,15 +52,24 @@ class Deck {
     }
   }
 
-  /// Shuffles the deck using optional string seed for determinism.
-  /// In multiplayer, the same seed (synced via Firebase GameState) ensures all players
-  /// initialize with identical deck order, enabling consistent game deals.
+  /// Shuffles the deck using an optional string seed for deterministic shuffling.
+  /// 
+  /// **Multiplayer Consideration**: In multiplayer games, the same seed
+  /// (synced via Firebase in GameState) ensures all players initialize with
+  /// identical deck order, enabling consistent game deals across all clients.
+  /// 
+  /// Parameters:
+  ///   - `seed`: Optional string to seed the random number generator.
+  ///     If provided, the same seed will always produce the same shuffle order.
   void shuffle([String? seed]) {
     final random = seed != null ? Random(_stringToIntHash(seed)) : Random();
     _cards.shuffle(random);
   }
 
   /// Converts a string seed to an integer hash for deterministic Random initialization.
+  /// 
+  /// Uses a simple polynomial rolling hash that produces consistent results
+  /// across different Dart/Flutter versions and platforms.
   int _stringToIntHash(String seed) {
     int seedInt = 0;
     for (int i = 0; i < seed.length; i++) {
@@ -58,20 +78,32 @@ class Deck {
     return seedInt;
   }
 
+  /// Removes and returns the last card from the deck (top of the stock).
+  /// 
+  /// Returns null if the deck is empty.
   Card? drawCard() {
     if (_cards.isEmpty) return null;
     return _cards.removeLast();
   }
 
+  /// Returns true if the deck has no cards remaining.
   bool get isEmpty => _cards.isEmpty;
 
+  /// Returns the number of cards currently in the deck.
   int get length => _cards.length;
 
+  /// Resets the deck to a new shuffled state with all 52 cards.
+  /// 
+  /// Parameters:
+  ///   - `seed`: Optional string to seed the shuffle for reproducibility.
   void reset({String? seed}) {
     _initializeDeck();
     shuffle(seed);
   }
 
+  /// Adds multiple cards to the deck, setting them face-down.
+  /// 
+  /// Used when recycling waste pile back to stock.
   void addCards(List<Card> cards) {
     final beforeCount = _cards.length;
     debugPrint('  📥 DECK addCards: Adding ${cards.length} cards to deck (current size=$beforeCount)');
@@ -84,9 +116,9 @@ class Deck {
     debugPrint('  📥 DECK addCards: Complete (new size=${_cards.length})');
   }
 
+  /// Returns an unmodifiable view of all cards in the deck.
   List<Card> get cards => List.unmodifiable(_cards);
 
-  // For debugging
   @override
   String toString() {
     return 'Deck(${_cards.length} cards)';

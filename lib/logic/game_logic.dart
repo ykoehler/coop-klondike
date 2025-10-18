@@ -2,12 +2,29 @@ import '../models/game_state.dart';
 import '../models/card.dart';
 import 'package:flutter/foundation.dart';
 
+/// Contains the core game rules and move validation logic for Klondike Solitaire.
+/// 
+/// This class provides static methods to:
+/// - Validate moves before execution (canXxx methods)
+/// - Execute valid moves (xxx methods)
+/// - Check game state (isGameWon, isGameStuck)
+/// 
+/// All methods assume the provided [GameState] is valid and won't perform
+/// extensive validation. The UI layer should call canXxx before calling the
+/// corresponding action method.
 class GameLogic {
-  // Draw card from stock to waste
+  // ============================================================================
+  // Stock/Waste Management
+  // ============================================================================
+
+  /// Checks if a card can be drawn from stock to waste.
   static bool canDrawCard(GameState state, DrawMode mode) {
     return !state.stock.isEmpty;
   }
 
+  /// Draws cards from stock to waste based on the draw mode (1 or 3 cards).
+  /// 
+  /// Each card is flipped face-up when moved to the waste pile.
   static void drawCard(GameState state, DrawMode mode) {
     if (!canDrawCard(state, mode)) return;
     
@@ -29,18 +46,68 @@ class GameLogic {
     }
     
     debugPrint('  📥 LOGIC drawCard: Complete (stock=${state.stock.length}, waste=${state.waste.length})');
-    
-    // Log stock operation for debugging
     _logStockOperation(state, 'draw', numToDraw);
   }
 
-  // Move from waste to tableau
+  /// Checks if waste can be recycled to stock.
+  /// 
+  /// True when stock is empty but waste has cards.
+  static bool canRecycleWaste(GameState state) {
+    return state.stock.isEmpty && state.waste.isNotEmpty;
+  }
+
+  /// Recycles waste pile back to stock in reverse order.
+  /// 
+  /// This maintains the cycle of the game. All waste cards are moved to stock
+  /// in reverse order (so they come out in the original order when drawn).
+  /// If stock has cards after recycling, automatically draws one batch to
+  /// ensure waste never appears empty during gameplay.
+  static void recycleWaste(GameState state) {
+    if (!canRecycleWaste(state)) {
+      return;
+    }
+    
+    final stockBefore = state.stock.length;
+    final wasteBefore = state.waste.length;
+    debugPrint('  ♻️ LOGIC recycleWaste: BEFORE (stock=$stockBefore, waste=$wasteBefore)');
+    
+    debugPrint('    Waste cards to recycle: ${state.waste.map((c) => '${c.rank.name}${c.suit.name}').join(', ')}');
+    
+    // Reverse the waste cards when moving back to stock
+    // This ensures they come out in the same order when drawn again
+    final reversedWaste = state.waste.reversed.toList();
+    debugPrint('    Reversed waste list created with ${reversedWaste.length} cards');
+    
+    state.stock.addCards(reversedWaste);
+    debugPrint('    After addCards: stock=${state.stock.length}');
+    
+    state.waste.clear();
+    debugPrint('    After waste.clear(): waste=${state.waste.length}');
+    
+    debugPrint('  ♻️ LOGIC recycleWaste: AFTER (stock=${state.stock.length}, waste=${state.waste.length})');
+    _logStockOperation(state, 'recycle', state.stock.length);
+    
+    // After recycling, immediately draw so waste is never empty when stock has cards
+    if (state.stock.length > 0) {
+      debugPrint('  ♻️ LOGIC recycleWaste: Auto-drawing after recycle to keep waste non-empty');
+      drawCard(state, state.drawMode);
+    } else {
+      debugPrint('  ♻️ LOGIC recycleWaste: Stock is empty after recycle, skipping auto-draw');
+    }
+  }
+
+  // ============================================================================
+  // Waste to Tableau/Foundation Moves
+  // ============================================================================
+
+  /// Checks if the top waste card can move to a tableau column.
   static bool canMoveWasteToTableau(GameState state, int tableauIndex) {
     if (state.waste.isEmpty) return false;
     final card = state.waste.last;
     return state.tableau[tableauIndex].canAcceptCard(card);
   }
 
+  /// Moves the top waste card to a tableau column.
   static void moveWasteToTableau(GameState state, int tableauIndex) {
     if (canMoveWasteToTableau(state, tableauIndex)) {
       final card = state.waste.removeLast();
@@ -49,13 +116,14 @@ class GameLogic {
     }
   }
 
-  // Move from waste to foundation
+  /// Checks if the top waste card can move to a foundation pile.
   static bool canMoveWasteToFoundation(GameState state, int foundationIndex) {
     if (state.waste.isEmpty) return false;
     final card = state.waste.last;
     return state.foundations[foundationIndex].canAcceptCard(card);
   }
 
+  /// Moves the top waste card to a foundation pile.
   static void moveWasteToFoundation(GameState state, int foundationIndex) {
     if (canMoveWasteToFoundation(state, foundationIndex)) {
       final card = state.waste.removeLast();
@@ -63,7 +131,17 @@ class GameLogic {
     }
   }
 
-  // Move from tableau to tableau
+  // ============================================================================
+  // Tableau to Tableau/Foundation Moves
+  // ============================================================================
+
+  /// Checks if cards can move from one tableau column to another.
+  /// 
+  /// Validates:
+  /// - Not moving to the same column
+  /// - Sufficient cards available in source column
+  /// - All cards are face-up (can't move face-down cards)
+  /// - Top card of moving sequence can stack on destination column
   static bool canMoveTableauToTableau(GameState state, int fromIndex, int toIndex, int cardCount) {
     if (fromIndex == toIndex || cardCount < 1) return false;
     final fromColumn = state.tableau[fromIndex];
@@ -76,6 +154,9 @@ class GameLogic {
     return state.tableau[toIndex].canAcceptCard(topMovingCard);
   }
 
+  /// Moves multiple cards from one tableau column to another.
+  /// 
+  /// Flips the newly exposed card in the source column if needed.
   static void moveTableauToTableau(GameState state, int fromIndex, int toIndex, int cardCount) {
     if (canMoveTableauToTableau(state, fromIndex, toIndex, cardCount)) {
       final fromColumn = state.tableau[fromIndex];
@@ -86,7 +167,7 @@ class GameLogic {
     }
   }
 
-  // Move from tableau to foundation
+  /// Checks if a tableau card can move to a foundation pile.
   static bool canMoveTableauToFoundation(GameState state, int tableauIndex, int foundationIndex) {
     final column = state.tableau[tableauIndex];
     if (column.isEmpty) return false;
@@ -95,6 +176,7 @@ class GameLogic {
     return state.foundations[foundationIndex].canAcceptCard(card);
   }
 
+  /// Moves a tableau card to a foundation pile.
   static void moveTableauToFoundation(GameState state, int tableauIndex, int foundationIndex) {
     if (canMoveTableauToFoundation(state, tableauIndex, foundationIndex)) {
       final card = state.tableau[tableauIndex].removeCard()!;
@@ -103,7 +185,14 @@ class GameLogic {
     }
   }
 
-  // Move from foundation to tableau (rare, but possible)
+  // ============================================================================
+  // Foundation to Tableau Moves (Undo Moves)
+  // ============================================================================
+
+  /// Checks if a foundation card can move back to a tableau column.
+  /// 
+  /// This supports undoing cards that were moved to foundation, enabling
+  /// more strategic gameplay.
   static bool canMoveFoundationToTableau(GameState state, int foundationIndex, int tableauIndex) {
     final pile = state.foundations[foundationIndex];
     if (pile.isEmpty) return false;
@@ -111,6 +200,7 @@ class GameLogic {
     return state.tableau[tableauIndex].canAcceptCard(card);
   }
 
+  /// Moves a foundation card back to a tableau column.
   static void moveFoundationToTableau(GameState state, int foundationIndex, int tableauIndex) {
     if (canMoveFoundationToTableau(state, foundationIndex, tableauIndex)) {
       final card = state.foundations[foundationIndex].cards.removeLast();
@@ -118,57 +208,26 @@ class GameLogic {
     }
   }
 
-  // Helper to flip top card in tableau if needed
-  static void _flipTableauTopCard(GameState state, int index) {
-    state.tableau[index].flipTopCard();
-  }
+  // ============================================================================
+  // Game State Checks
+  // ============================================================================
 
-  // Recycle waste to stock
-  static bool canRecycleWaste(GameState state) {
-    return state.stock.isEmpty && state.waste.isNotEmpty;
-  }
-
-  static void recycleWaste(GameState state) {
-    if (canRecycleWaste(state)) {
-      final stockBefore = state.stock.length;
-      final wasteBefore = state.waste.length;
-      debugPrint('  ♻️ LOGIC recycleWaste: BEFORE (stock=$stockBefore, waste=$wasteBefore)');
-      
-      // Log the waste cards that will be recycled
-      debugPrint('    Waste cards to recycle: ${state.waste.map((c) => '${c.rank.name}${c.suit.name}').join(', ')}');
-      
-      // Reverse the waste cards when moving back to stock
-      // This ensures they come out in the same order when drawn again
-      final reversedWaste = state.waste.reversed.toList();
-      debugPrint('    Reversed waste list created with ${reversedWaste.length} cards');
-      
-      state.stock.addCards(reversedWaste);
-      debugPrint('    After addCards: stock=${state.stock.length}');
-      
-      state.waste.clear();
-      debugPrint('    After waste.clear(): waste=${state.waste.length}');
-      
-      debugPrint('  ♻️ LOGIC recycleWaste: AFTER (stock=${state.stock.length}, waste=${state.waste.length})');
-      
-      // Log stock operation for debugging
-      _logStockOperation(state, 'recycle', state.stock.length);
-      
-      // After recycling, immediately draw so waste is never empty when stock has cards
-      if (state.stock.length > 0) {
-        debugPrint('  ♻️ LOGIC recycleWaste: Auto-drawing after recycle to keep waste non-empty');
-        drawCard(state, state.drawMode);
-      } else {
-        debugPrint('  ♻️ LOGIC recycleWaste: Stock is empty after recycle, skipping auto-draw');
-      }
-    }
-  }
-
-  // Check if game is won
+  /// Checks if the game has been won.
+  /// 
+  /// True when all 4 foundation piles are complete (13 cards each).
   static bool isGameWon(GameState state) {
     return state.isWon;
   }
 
-  // Check if game is stuck (no progress moves possible and not won)
+  /// Checks if the game is in a stuck state (no legal moves possible).
+  /// 
+  /// A game is stuck when:
+  /// - Not won
+  /// - No cards can be drawn or recycled
+  /// - No waste to tableau/foundation moves available
+  /// - No tableau to tableau moves available
+  /// - No tableau to foundation moves available
+  /// - No foundation to tableau moves available
   static bool isGameStuck(GameState state) {
     if (isGameWon(state)) return false;
 
@@ -214,7 +273,19 @@ class GameLogic {
     return true; // No moves possible
   }
 
-  /// Logs stock operations for debugging duplicate card issues
+  // ============================================================================
+  // Helper Methods
+  // ============================================================================
+
+  /// Flips the top card of a tableau column if it's face-down.
+  static void _flipTableauTopCard(GameState state, int index) {
+    state.tableau[index].flipTopCard();
+  }
+
+  /// Logs stock operations and card integrity for debugging duplicate issues.
+  /// 
+  /// This validates that all 52 cards remain in the game and detects duplicates.
+  /// Only enabled in debug mode to avoid performance impact.
   static void _logStockOperation(GameState state, String operation, int count) {
     final allCards = <Card>[];
     for (final column in state.tableau) {

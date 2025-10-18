@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:async';
 
 /// Utility class to precache all SVG card assets
 class SvgCache {
@@ -8,22 +9,30 @@ class SvgCache {
   
   /// Precache all card SVGs to prevent loading flash
   static Future<void> precacheCardSvgs(BuildContext context) async {
-    final futures = <Future<void>>[];
-    
-    // Precache face down card
-    futures.add(_precacheSvg(context, 'assets/cards/svgs/card_face_down.svg'));
-    
-    // Precache all 52 cards
-    for (final suit in _suits) {
-      for (final rank in _ranks) {
-        final path = 'assets/cards/svgs/${suit}_$rank.svg';
-        futures.add(_precacheSvg(context, path));
+    try {
+      final futures = <Future<void>>[];
+      
+      // Precache face down card
+      futures.add(_precacheSvg(context, 'assets/cards/svgs/card_face_down.svg'));
+      
+      // Precache all 52 cards
+      for (final suit in _suits) {
+        for (final rank in _ranks) {
+          final path = 'assets/cards/svgs/${suit}_$rank.svg';
+          futures.add(_precacheSvg(context, path));
+        }
       }
+      
+      // Wait for all SVGs to be cached with a timeout
+      try {
+        await Future.wait(futures).timeout(const Duration(seconds: 30));
+        debugPrint('✅ All ${futures.length} card SVGs precached successfully');
+      } on TimeoutException {
+        debugPrint('⚠️ SVG precaching timed out after 30 seconds, continuing with partial cache');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error precaching SVGs: $e, continuing anyway');
     }
-    
-    // Wait for all SVGs to be cached
-    await Future.wait(futures);
-    debugPrint('✅ All ${futures.length} card SVGs precached successfully');
   }
   
   /// Precache a single SVG asset

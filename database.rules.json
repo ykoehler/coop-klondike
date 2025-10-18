@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "games": {
+      "$gameId": {
+        ".read": true,
+        ".write": true,
+        "locks": {
+          ".read": true,
+          ".write": true
+        },
+        "dragPositions": {
+          ".read": true,
+          ".write": true
+        }
+      }
+    }
+  }
+}

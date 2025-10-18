@@ -12,7 +12,7 @@ import 'dart:math';
 
 class GameProvider extends ChangeNotifier {
   final FirebaseService firebaseService;
-  GameState? _gameState; // Changed from late to nullable
+  GameState? _gameState;
   DrawMode _currentDrawMode = DrawMode.three;
   GameLock? _currentLock;
   DragState? _currentDrag;
@@ -24,11 +24,13 @@ class GameProvider extends ChangeNotifier {
   StreamSubscription? _dragSubscription;
   bool _mounted = true;
   bool _isInitializing = true;
-  late FirebaseService _firebaseService;
-  late String _actualGameId;
   bool _isInitialSetup;
+  final String? _providedSeedStr;
+  bool _isDragging = false;
+  GameState? _pendingStateUpdate;
 
-  // Return a safe game state even if not initialized yet
+  /// Safely access game state. If not yet initialized, returns a temporary instance.
+  /// This ensures the UI doesn't crash during initialization while we load from Firebase.
   GameState get gameState => _gameState ?? GameState(
     gameId: _gameId,
     seedStr: _providedSeedStr ?? SeedGenerator.deriveFromGameId(_gameId),
@@ -65,8 +67,6 @@ class GameProvider extends ChangeNotifier {
        _gameId = gameId ?? _generateGameId(),
        _isInitialSetup = isInitialSetup {
     _currentDrawMode = drawMode ?? DrawMode.three;
-    _firebaseService = firebaseService;
-    _actualGameId = _gameId;
     // Initialize with a temporary game state immediately
     _gameState = GameState(
       gameId: _gameId,
@@ -94,8 +94,6 @@ class GameProvider extends ChangeNotifier {
        _gameId = gameId ?? _generateGameId(),
        _isInitialSetup = isInitialSetup {
     _currentDrawMode = drawMode ?? DrawMode.three;
-    _firebaseService = firebaseService;
-    _actualGameId = _gameId;
     if (synchronous) {
       _initializeSynchronously();
     } else {
@@ -114,10 +112,6 @@ class GameProvider extends ChangeNotifier {
     );
     _isInitializing = false;
   }
-
-  final String? _providedSeedStr;
-  bool _isDragging = false;
-  GameState? _pendingStateUpdate;
 
   static String _generatePlayerId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -311,7 +305,7 @@ class GameProvider extends ChangeNotifier {
     bool gameCreated = false;
     try {
       // First, try to load existing game
-      final existingGame = await _firebaseService.getGame(_actualGameId);
+      final existingGame = await firebaseService.getGame(_gameId);
 
       if (existingGame != null) {
         _gameState = existingGame;
@@ -325,8 +319,8 @@ class GameProvider extends ChangeNotifier {
         );
 
         // Try atomic creation
-        gameCreated = await _firebaseService.createGameIfNotExists(
-          _actualGameId,
+        gameCreated = await firebaseService.createGameIfNotExists(
+          _gameId,
           newGameState,
         );
 
@@ -336,7 +330,7 @@ class GameProvider extends ChangeNotifier {
         } else {
           // Another player created it in the meantime, load their version
           await Future.delayed(Duration(milliseconds: 300));
-          final retryGame = await _firebaseService.getGame(_actualGameId);
+          final retryGame = await firebaseService.getGame(_gameId);
           if (retryGame != null) {
             _gameState = retryGame;
             _gameState!.existsInFirebase = true;
@@ -352,8 +346,8 @@ class GameProvider extends ChangeNotifier {
       if (_mounted) notifyListeners();
 
       // Subscribe to game state changes
-      _gameSubscription = _firebaseService
-          .listenToGame(_actualGameId)
+      _gameSubscription = firebaseService
+          .listenToGame(_gameId)
           .listen(
             (newState) {
               try {
@@ -514,18 +508,18 @@ class GameProvider extends ChangeNotifier {
   Future<bool> acquireLock(String action) async {
     if (_currentLock?.isLocked ?? false) {
       if (_currentLock?.isLockExpired ?? false) {
-        await _firebaseService.setGameLock(_actualGameId, _playerId, false);
+        await firebaseService.setGameLock(_gameId, _playerId, false);
       } else {
         return false;
       }
     }
 
-    await _firebaseService.setGameLock(_actualGameId, _playerId, true);
+    await firebaseService.setGameLock(_gameId, _playerId, true);
     return true;
   }
 
   Future<void> releaseLock() async {
-    await _firebaseService.setGameLock(_actualGameId, _playerId, false);
+    await firebaseService.setGameLock(_gameId, _playerId, false);
   }
 
   Future<void> _updateGameState() async {
@@ -533,8 +527,8 @@ class GameProvider extends ChangeNotifier {
   }
 
   Future<void> updateDragPosition(String cardId, double x, double y) async {
-    await _firebaseService.updateDragPosition(
-      _actualGameId,
+    await firebaseService.updateDragPosition(
+      _gameId,
       cardId,
       x,
       y,
@@ -558,28 +552,86 @@ class GameProvider extends ChangeNotifier {
   }
 
   Future<void> setupInitialGameState() async {
-    if (await acquireLock('setupGame')) {
-      try {
-        _gameState!.drawMode = _currentDrawMode;
-        await _updateGameState();
-      } finally {
-        await releaseLock();
+    int retries = 0;
+    const maxRetries = 10;
+    final startTime = DateTime.now();
+    const maxDuration = Duration(seconds: 5);
+    
+    while (retries < maxRetries) {
+      // Check if we've exceeded the maximum time
+      if (DateTime.now().difference(startTime) > maxDuration) {
+        debugPrint('⚠️ setupInitialGameState: Max duration reached (5s), giving up on lock');
+        break;
       }
-      if (_mounted) {
-        notifyListeners();
+      
+      if (await acquireLock('setupGame')) {
+        try {
+          _gameState!.drawMode = _currentDrawMode;
+          await _updateGameState();
+          debugPrint('✅ setupInitialGameState: SUCCESS');
+        } finally {
+          await releaseLock();
+        }
+        if (_mounted) {
+          notifyListeners();
+        }
+        return;
       }
+      retries++;
+      debugPrint('⚠️ setupInitialGameState: Lock acquisition failed (retry $retries/$maxRetries)');
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+    
+    // If we've retried too many times or timed out, just update the state without the lock
+    // This ensures the game doesn't get stuck and multiple clients can play together
+    debugPrint('⚠️ setupInitialGameState: Giving up on lock, updating without lock');
+    _gameState!.drawMode = _currentDrawMode;
+    await _updateGameState();
+    if (_mounted) {
+      notifyListeners();
     }
   }
 
   Future<void> changeDrawMode(DrawMode newMode) async {
-    if (await acquireLock('changeDrawMode')) {
-      _currentDrawMode = newMode;
-      _gameState!.drawMode = newMode;  // Also update the game state's draw mode
-      await _updateGameState();
-      await releaseLock();
-      if (_mounted) {
-        notifyListeners();
+    int retries = 0;
+    const maxRetries = 10;
+    final startTime = DateTime.now();
+    const maxDuration = Duration(seconds: 5);
+    
+    while (retries < maxRetries) {
+      // Check if we've exceeded the maximum time
+      if (DateTime.now().difference(startTime) > maxDuration) {
+        debugPrint('⚠️ changeDrawMode: Max duration reached (5s), giving up on lock');
+        break;
       }
+      
+      if (await acquireLock('changeDrawMode')) {
+        try {
+          _currentDrawMode = newMode;
+          _gameState!.drawMode = newMode;
+          await _updateGameState();
+          debugPrint('✅ changeDrawMode: SUCCESS');
+        } finally {
+          await releaseLock();
+        }
+        if (_mounted) {
+          notifyListeners();
+        }
+        return;
+      }
+      retries++;
+      debugPrint('⚠️ changeDrawMode: Lock acquisition failed (retry $retries/$maxRetries)');
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+    
+    // If we've retried too many times or timed out, just update the state without the lock
+    // This ensures multiple clients can play together
+    debugPrint('⚠️ changeDrawMode: Giving up on lock, updating without lock');
+    _currentDrawMode = newMode;
+    _gameState!.drawMode = newMode;
+    await _updateGameState();
+    if (_mounted) {
+      notifyListeners();
     }
   }
 
