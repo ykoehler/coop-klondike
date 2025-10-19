@@ -875,14 +875,20 @@ class GameProvider extends ChangeNotifier {
   }
   
   /// Returns the cached game stuck status. Only updated when specifically checked.
+  /// Checks if the game is stuck, but only when safe to do so.
+  /// Returns false if there are pending actions to avoid false positives during moves.
   bool get isGameStuck {
+    // CRITICAL: Don't check for stuck state while moves are being processed
+    // This prevents false "game over" detection during card movements
+    if (_pendingActionCount > 0 || _isDragging) {
+      debugPrint('🎮 isGameStuck check DEFERRED: pendingActions=$_pendingActionCount, isDragging=$_isDragging');
+      return false;
+    }
+    
     if (_cachedIsGameStuck != null) {
       return _cachedIsGameStuck!;
     }
     // Fall back to checking if needed (shouldn't happen in normal flow)
-    if (_pendingActionCount > 0 || _isDragging) {
-      return false;
-    }
     return GameLogic.isGameStuck(_gameState!);
   }
 
