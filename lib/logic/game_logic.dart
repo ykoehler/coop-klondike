@@ -1,7 +1,10 @@
 import '../models/game_state.dart';
 import '../models/card.dart';
 import '../models/hint.dart';
+import '../models/tableau_column.dart';
+import '../models/foundation_pile.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:math';
 
 /// Contains the core game rules and move validation logic for Klondike Solitaire.
 /// 
@@ -235,53 +238,181 @@ class GameLogic {
   static bool isGameStuck(GameState state) {
     if (isGameWon(state)) return false;
 
-    // Check if can draw from stock or recycle waste (fastest operations)
-    if (canDrawCard(state, state.drawMode)) return false;
-    if (canRecycleWaste(state)) return false;
-
-    // Check waste to tableau moves (fast - at most 7 checks)
-    for (int i = 0; i < 7; i++) {
-      if (canMoveWasteToTableau(state, i)) return false;
-    }
-
-    // Check waste to foundation moves (fast - at most 4 checks)
-    for (int i = 0; i < 4; i++) {
-      if (canMoveWasteToFoundation(state, i)) return false;
-    }
-
-    // Check foundation to tableau moves (moderate - 4*7 checks)
-    // This often reveals available moves and is faster than tableau-to-tableau
-    for (int f = 0; f < 4; f++) {
-      for (int t = 0; t < 7; t++) {
-        if (canMoveFoundationToTableau(state, f, t)) return false;
+    // Helper function to check if any move is available in current state
+    bool hasAnyMove(GameState checkState) {
+      // Check waste to tableau moves
+      for (int i = 0; i < 7; i++) {
+        if (canMoveWasteToTableau(checkState, i)) return true;
       }
-    }
 
-    // Check tableau to foundation moves (moderate - 7*4 checks)
-    for (int t = 0; t < 7; t++) {
+      // Check waste to foundation moves
+      for (int i = 0; i < 4; i++) {
+        if (canMoveWasteToFoundation(checkState, i)) return true;
+      }
+
+      // Check foundation to tableau moves (undo moves)
       for (int f = 0; f < 4; f++) {
-        if (canMoveTableauToFoundation(state, t, f)) return false;
+        for (int t = 0; t < 7; t++) {
+          if (canMoveFoundationToTableau(checkState, f, t)) return true;
+        }
       }
+
+      // Check tableau to foundation moves
+      for (int t = 0; t < 7; t++) {
+        for (int f = 0; f < 4; f++) {
+          if (canMoveTableauToFoundation(checkState, t, f)) return true;
+        }
+      }
+
+      // Check tableau to tableau moves
+      for (int from = 0; from < 7; from++) {
+        if (checkState.tableau[from].isEmpty) continue;
+        
+        final sourceCards = checkState.tableau[from].cards;
+        int sourceLength = sourceCards.length;
+        
+        for (int to = 0; to < 7; to++) {
+          if (from == to) continue;
+          
+          for (int count = 1; count <= sourceLength; count++) {
+            if (canMoveTableauToTableau(checkState, from, to, count)) return true;
+          }
+        }
+      }
+
+      return false;
     }
 
-    // Check tableau to tableau moves (most expensive - only if absolutely needed)
-    // Strategy: Check each source column's top card against all destinations first
-    for (int from = 0; from < 7; from++) {
-      if (state.tableau[from].isEmpty) continue;
+    // First check if there are immediate moves available
+    if (hasAnyMove(state)) return false;
+
+    // If no immediate moves but stock and waste are both empty, definitely stuck
+    if (state.stock.isEmpty && state.waste.isEmpty) {
+      debugPrint('❌ STUCK: Both stock and waste are empty, no moves available');
+      return true;
+    }
+
+    // CRITICAL: If stock has cards, simulate drawing through the ENTIRE cycle
+    // to see if ANY card that could appear in waste is actually moveable.
+    // Simply having cards in stock does NOT mean the game is playable!
+    if (!state.stock.isEmpty) {
+      debugPrint('📊 Simulating stock cycle (${state.stock.length} cards)...');
       
-      final sourceCards = state.tableau[from].cards;
-      int sourceLength = sourceCards.length;
+      // Simulate cycling through all remaining stock cards
+      // We'll track which cards we've seen in waste and check if any are moveable
+      final stockCardsCopy = List<Card>.from(state.stock.cards);
+      final wasteCopy = List<Card>.from(state.waste);
       
-      for (int to = 0; to < 7; to++) {
-        if (from == to) continue;
+      // IMPORTANT: Create DEEP copies of tableau and foundations to avoid modifying original state
+      final tableauCopy = state.tableau.map((col) {
+        final columnCopy = TableauColumn(columnIndex: col.columnIndex);
+        // Deep copy cards to avoid modifying original card objects
+        columnCopy.cards = col.cards.map((card) {
+          final cardCopy = Card(suit: card.suit, rank: card.rank);
+          cardCopy.faceUp = card.faceUp;
+          return cardCopy;
+        }).toList();
+        return columnCopy;
+      }).toList();
+      final foundationsCopy = state.foundations.map((pile) {
+        final pileCopy = FoundationPile();
+        // Deep copy cards
+        pileCopy.cards = pile.cards.map((card) {
+          final cardCopy = Card(suit: card.suit, rank: card.rank);
+          cardCopy.faceUp = card.faceUp;
+          return cardCopy;
+        }).toList();
+        pileCopy.suit = pile.suit;
+        return pileCopy;
+      }).toList();
+      
+      int drawsToSimulate = stockCardsCopy.length;
+      final int drawMode = state.drawMode == DrawMode.one ? 1 : 3;
+      
+      while (drawsToSimulate > 0 && stockCardsCopy.isNotEmpty) {
+        // Draw cards (simulate)
+        final numToDraw = min(drawMode, stockCardsCopy.length);
+        for (int i = 0; i < numToDraw; i++) {
+          final card = stockCardsCopy.removeAt(0);
+          card.faceUp = true;
+          wasteCopy.add(card);
+        }
         
-        // Try all possible card counts from this source, stopping at first valid move
-        for (int count = 1; count <= sourceLength; count++) {
-          if (canMoveTableauToTableau(state, from, to, count)) return false;
+        // After drawing, check if top waste card can now move
+        if (wasteCopy.isNotEmpty) {
+          final topWaste = wasteCopy.last;
+          
+          // Check waste to tableau
+          for (int i = 0; i < 7; i++) {
+            if (tableauCopy[i].canAcceptCard(topWaste)) {
+              debugPrint('✅ Found moveable card in stock: waste → tableau[$i]');
+              return false;
+            }
+          }
+          
+          // Check waste to foundation
+          for (int i = 0; i < 4; i++) {
+            if (foundationsCopy[i].canAcceptCard(topWaste)) {
+              debugPrint('✅ Found moveable card in stock: waste → foundation[$i]');
+              return false;
+            }
+          }
+        }
+        
+        drawsToSimulate--;
+      }
+      
+      // If we get here with stock cards, need to check if recycling helps
+      if (wasteCopy.isNotEmpty) {
+        debugPrint('📊 Stock exhausted, checking waste recycle cycle...');
+        // After first cycle, waste would be recycled
+        // Check if any card in waste could move
+        final allWasteCards = List<Card>.from(wasteCopy);
+        for (final card in allWasteCards) {
+          card.faceUp = true;
+          
+          // Check each waste card (any of them could come up)
+          for (int i = 0; i < 7; i++) {
+            if (tableauCopy[i].canAcceptCard(card)) {
+              debugPrint('✅ Found moveable waste card after recycle: → tableau[$i]');
+              return false;
+            }
+          }
+          
+          for (int i = 0; i < 4; i++) {
+            if (foundationsCopy[i].canAcceptCard(card)) {
+              debugPrint('✅ Found moveable waste card after recycle: → foundation[$i]');
+              return false;
+            }
+          }
+        }
+      }
+    }
+    
+    // If waste has cards but stock is empty, check if any waste card can move
+    if (state.waste.isNotEmpty && state.stock.isEmpty) {
+      debugPrint('📊 Checking waste cards with empty stock...');
+      
+      for (final card in state.waste) {
+        // Check tableau
+        for (int i = 0; i < 7; i++) {
+          if (state.tableau[i].canAcceptCard(card)) {
+            debugPrint('✅ Found moveable waste card: → tableau[$i]');
+            return false;
+          }
+        }
+        
+        // Check foundation
+        for (int i = 0; i < 4; i++) {
+          if (state.foundations[i].canAcceptCard(card)) {
+            debugPrint('✅ Found moveable waste card: → foundation[$i]');
+            return false;
+          }
         }
       }
     }
 
+    debugPrint('❌ STUCK: No cards from stock/waste are moveable, game is stuck');
     return true; // No moves possible
   }
 

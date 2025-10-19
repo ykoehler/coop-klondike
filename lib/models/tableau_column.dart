@@ -1,5 +1,6 @@
 import 'card.dart';
 import '../utils/json_utils.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 class TableauColumn {
   TableauColumn({this.columnIndex = 0, List<Card>? initialCards})
@@ -21,19 +22,31 @@ class TableauColumn {
     Map<String, dynamic> json, {
     required int fallbackIndex,
   }) {
-    final inferredIndex = json['columnIndex'] ?? json['index'];
-    final columnIndex = inferredIndex is int
-        ? inferredIndex
-        : int.tryParse(inferredIndex?.toString() ?? '') ?? fallbackIndex;
+    try {
+      final inferredIndex = json['columnIndex'] ?? json['index'];
+      final columnIndex = inferredIndex is int
+          ? inferredIndex
+          : int.tryParse(inferredIndex?.toString() ?? '') ?? fallbackIndex;
 
-    final column = TableauColumn(columnIndex: columnIndex);
-    if (json.containsKey('cards') && json['cards'] != null) {
-      column.cards = normalizeMapList(json['cards'])
-          .map((card) => Card.fromJson(card))
-          .toList();
+      final column = TableauColumn(columnIndex: columnIndex);
+      if (json.containsKey('cards') && json['cards'] != null) {
+        final cardsData = json['cards'];
+        debugPrint('  📋 TABLEAUCOLUMN $columnIndex fromJson: cards field type = ${cardsData.runtimeType}');
+        
+        column.cards = normalizeMapList(cardsData)
+            .map((card) => Card.fromJson(card))
+            .toList();
+        
+        debugPrint('  📋 TABLEAUCOLUMN $columnIndex fromJson: Loaded ${column.cards.length} cards');
+      }
+
+      return column;
+    } catch (e, stackTrace) {
+      debugPrint('  ❌ TABLEAUCOLUMN fromJson ERROR: $e');
+      debugPrint('     Input JSON: ${json.toString().substring(0, 200)}...');
+      debugPrint('     Stack trace: $stackTrace');
+      rethrow;
     }
-
-    return column;
   }
 
   bool canAcceptCard(Card card) {

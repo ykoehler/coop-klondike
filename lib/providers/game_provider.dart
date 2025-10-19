@@ -408,14 +408,19 @@ class GameProvider extends ChangeNotifier {
                   notifyListeners();
                 }
               } catch (error, stackTrace) {
-                debugPrint('GameProvider: Error processing game state: $error');
-                debugPrint('Stack trace: $stackTrace');
+                debugPrint('❌ GameProvider: Error processing game state: $error');
+                debugPrint('   Error type: ${error.runtimeType}');
+                debugPrint('   newState stock: ${(error is StateError ? 'N/A' : 'available')}');
+                debugPrint('   Full stack trace:');
+                debugPrint('$stackTrace');
               }
             },
             onError: (error, stackTrace) {
               // Log deserialization errors but don't crash the app
-              debugPrint('GameProvider: Error in game state stream: $error');
-              debugPrint('Stack trace: $stackTrace');
+              debugPrint('❌ GameProvider: Error in game state stream: $error');
+              debugPrint('   Error type: ${error.runtimeType}');
+              debugPrint('   Full stack trace:');
+              debugPrint('$stackTrace');
               // Continue listening - the stream will keep trying
             },
             cancelOnError: false,
@@ -539,13 +544,19 @@ class GameProvider extends ChangeNotifier {
 
       if (_currentLock?.isLocked ?? false) {
         if (_currentLock?.isLockExpired ?? false) {
-          await firebaseService.setGameLock(_gameId, _playerId, false);
+          await firebaseService.setGameLock(_gameId, _playerId, false).timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => debugPrint('⚠️ Lock clear timeout - continuing'),
+          );
         } else {
           return false;
         }
       }
 
-      await firebaseService.setGameLock(_gameId, _playerId, true);
+      await firebaseService.setGameLock(_gameId, _playerId, true).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => debugPrint('⚠️ Lock acquire timeout - continuing'),
+      );
       return true;
     } catch (e, stackTrace) {
       // If lock acquisition fails, log it but allow gameplay to continue
@@ -564,7 +575,10 @@ class GameProvider extends ChangeNotifier {
         return;
       }
 
-      await firebaseService.setGameLock(_gameId, _playerId, false);
+      await firebaseService.setGameLock(_gameId, _playerId, false).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => debugPrint('⚠️ Lock release timeout - continuing'),
+      );
     } catch (e, stackTrace) {
       // Log but don't rethrow - lock release failures shouldn't break gameplay
       debugPrint('⚠️ Warning: Failed to release lock: $e');
@@ -875,14 +889,20 @@ class GameProvider extends ChangeNotifier {
   }
   
   /// Returns the cached game stuck status. Only updated when specifically checked.
+  /// Checks if the game is stuck, but only when safe to do so.
+  /// Returns false if there are pending actions to avoid false positives during moves.
   bool get isGameStuck {
+    // CRITICAL: Don't check for stuck state while moves are being processed
+    // This prevents false "game over" detection during card movements
+    if (_pendingActionCount > 0 || _isDragging) {
+      debugPrint('🎮 isGameStuck check DEFERRED: pendingActions=$_pendingActionCount, isDragging=$_isDragging');
+      return false;
+    }
+    
     if (_cachedIsGameStuck != null) {
       return _cachedIsGameStuck!;
     }
     // Fall back to checking if needed (shouldn't happen in normal flow)
-    if (_pendingActionCount > 0 || _isDragging) {
-      return false;
-    }
     return GameLogic.isGameStuck(_gameState!);
   }
 

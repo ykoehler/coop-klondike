@@ -189,4 +189,88 @@ test.describe('Game Over Detection Tests', () => {
       console.log('⚠️ Could not reach game over state with this seed, test inconclusive');
     }
   });
+
+  test('Game over when stock is empty AND waste is empty', async ({ page }) => {
+    // This test specifically targets the scenario where:
+    // 1. Stock has no cards
+    // 2. Waste has no cards  
+    // 3. No moves are available
+    // The game should show "Game Over" dialog
+    
+    await page.evaluate(async () => {
+      await window.testHooks.configureGame('empty-stock-waste-test', 'three');
+      
+      // Drain stock AND waste completely until both are empty
+      let iterations = 0;
+      const maxIterations = 200;
+      
+      while (iterations < maxIterations) {
+        const stockCount = window.testHooks.getStockCount();
+        const wasteCount = await (async () => {
+          const waste = await window.testHooks.getWasteSnapshot?.();
+          return waste?.length ?? 0;
+        })();
+        
+        if (stockCount === 0 && wasteCount === 0) {
+          console.log(`✅ Both stock and waste empty after ${iterations} iterations`);
+          break;
+        }
+        
+        // Tap stock to cycle through it
+        const result = await window.testHooks.tapStock();
+        
+        if (result === 'noop') {
+          // Can't draw or recycle, so both must be empty
+          console.log(`✅ tapStock returned 'noop' - both stock and waste empty`);
+          break;
+        }
+        
+        iterations++;
+      }
+      
+      if (iterations >= maxIterations) {
+        console.log('⚠️ Did not reach empty state within max iterations');
+      }
+    });
+
+    // Wait for game state to update
+    await page.waitForTimeout(800);
+
+    // Check state
+    const stockCount = await page.evaluate(() => window.testHooks.getStockCount());
+    const wasteCount = await page.evaluate(async () => {
+      const waste = await window.testHooks.getWasteSnapshot?.();
+      return waste?.length ?? 0;
+    });
+    
+    console.log(`Final state - Stock: ${stockCount}, Waste: ${wasteCount}`);
+
+    // Check for game over dialog
+    const gameOverDialog = await page.locator('text=Game Over').first();
+    const isGameStuck = await page.evaluate(() => window.testHooks.isGameStuck?.());
+    const isGameWon = await page.evaluate(() => window.testHooks.isGameWon?.());
+
+    console.log(`Game state - isStuck: ${isGameStuck}, isWon: ${isGameWon}`);
+
+    if (stockCount === 0 && wasteCount === 0 && !isGameWon) {
+      // If we truly have no cards in stock/waste and haven't won,
+      // we should either be stuck OR there are still moves available
+      if (isGameStuck) {
+        const gameOverVisible = await gameOverDialog.isVisible().catch(() => false);
+        expect(gameOverVisible).toBe(true);
+        
+        // Verify the message
+        const message = await page.locator('text=No more moves available').first();
+        expect(await message.isVisible()).toBe(true);
+        
+        console.log('✅ Game Over dialog correctly shown when stock and waste are empty with no moves');
+      } else {
+        console.log('⚠️ Stock and waste are empty but game is not stuck - moves still available in tableau/foundation');
+      }
+    } else if (stockCount > 0 || wasteCount > 0) {
+      console.log('⚠️ Could not fully drain stock and waste with this seed');
+    } else if (isGameWon) {
+      console.log('✅ Game was won before stock/waste emptied');
+    }
+  });
 });

@@ -29,6 +29,31 @@ class FirebaseService {
     throw Exception('Value is not a Map: $value');
   }
 
+  /// Debug helper to deeply log Firebase data structure
+  String _debugLogFirebaseData(Object? data, {int depth = 0, int maxDepth = 5}) {
+    if (depth > maxDepth) return '...';
+    
+    final indent = '  ' * depth;
+    
+    if (data == null) {
+      return '${indent}null';
+    } else if (data is Map) {
+      final entries = data.entries.map((e) {
+        final value = _debugLogFirebaseData(e.value, depth: depth + 1, maxDepth: maxDepth);
+        return '${indent}  ${e.key}: $value';
+      }).join('\n');
+      return '${indent}Map<dynamic, dynamic> {\n$entries\n$indent}';
+    } else if (data is List) {
+      final items = data.asMap().entries.map((e) {
+        final value = _debugLogFirebaseData(e.value, depth: depth + 1, maxDepth: maxDepth);
+        return '${indent}  [${e.key}]: $value';
+      }).join('\n');
+      return '${indent}List<dynamic> [\n$items\n$indent]';
+    } else {
+      return '${indent}${data.runtimeType}: $data';
+    }
+  }
+
   FirebaseService._internal() {
     _database.setLoggingEnabled(false); // Disable logging to suppress warnings
     _gamesRef = _database.ref('games');
@@ -113,7 +138,11 @@ class FirebaseService {
             }
             
             final rawData = event.snapshot.value!;
+            debugPrint('📥 FIREBASE RAW DATA: ${_debugLogFirebaseData(rawData)}');
+            
             final data = _convertToStringDynamicMap(rawData);
+            debugPrint('📥 FIREBASE CONVERTED DATA keys: ${data.keys.toList()}');
+            
             final gameState = GameState.fromJson(data);
             
             debugPrint('📥 FIREBASE IN [listenToGame]: gameId=$gameId');
@@ -123,12 +152,24 @@ class FirebaseService {
             sink.add(gameState);
           } catch (e, stackTrace) {
             debugPrint('❌ FIREBASE IN [listenToGame]: Failed to deserialize game state: $e');
+            debugPrint('   Error type: ${e.runtimeType}');
+            
+            // Log the raw data that caused the error
+            try {
+              final rawData = event.snapshot.value;
+              debugPrint('❌ Firebase raw data at error:');
+              debugPrint('${_debugLogFirebaseData(rawData)}');
+            } catch (debugError) {
+              debugPrint('❌ Could not log raw data: $debugError');
+            }
+            
             debugPrint('Stack trace: $stackTrace');
             sink.addError(e, stackTrace);
           }
         },
         handleError: (error, stackTrace, sink) {
           debugPrint('❌ FIREBASE IN [listenToGame]: Stream error: $error');
+          debugPrint('Stack trace: $stackTrace');
           sink.addError(error, stackTrace);
         },
       ),
@@ -144,30 +185,29 @@ class FirebaseService {
         return;
       }
 
-      // Sanitize IDs to ensure they contain only safe characters for Firebase paths
-      final safeGameId = gameId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
-      final safePlayerId = playerId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
-
-      debugPrint('🔒 Firebase setGameLock: gameId=$safeGameId, playerId=$safePlayerId, isLocked=$isLocked');
+      debugPrint('🔒 Firebase setGameLock: gameId=$gameId, playerId=$playerId, isLocked=$isLocked');
 
       // Build minimal lock data
       final lockData = {
         'isLocked': isLocked,
-        'playerId': safePlayerId,
+        'playerId': playerId,
       };
 
-      final lockRef = _gamesRef.child('$safeGameId/lock');
+      final lockRef = _gamesRef.child('$gameId/lock');
       
-      try {
-        // Try update - more efficient if node exists
-        await lockRef.update(lockData);
-      } catch (_) {
-        // If update fails (node doesn't exist), use set instead
-        await lockRef.set(lockData);
-      }
-    } catch (e) {
+      // Use set instead of update to avoid potential issues
+      // This is safer and more reliable for lock operations
+      // Add timeout to prevent indefinite hanging
+      await lockRef.set(lockData).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('⚠️ Firebase setGameLock timeout after 5s - continuing anyway');
+        },
+      );
+    } catch (e, stackTrace) {
       // Log but don't rethrow - lock failures shouldn't break gameplay
       debugPrint('⚠️ Firebase setGameLock error (non-critical): $e');
+      debugPrint('Stack trace: $stackTrace');
     }
   }
 

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show debugPrint;
+
 /// Represents the four suits in a standard deck of cards.
 enum Suit { hearts, diamonds, clubs, spades }
 
@@ -34,11 +36,44 @@ class Card {
     'faceUp': faceUp,
   };
 
-  static Card fromJson(Map<String, dynamic> json) => Card(
-    suit: Suit.values.firstWhere((s) => s.toString() == json['suit']),
-    rank: Rank.values.firstWhere((r) => r.toString() == json['rank']),
-    faceUp: json['faceUp'] as bool,
-  );
+  static Card fromJson(Map<String, dynamic> json) {
+    try {
+      final suitStr = json['suit'] as String?;
+      final rankStr = json['rank'] as String?;
+      final faceUp = json['faceUp'] as bool?;
+      
+      if (suitStr == null) {
+        throw FormatException('Missing "suit" field. Available keys: ${json.keys.join(", ")}');
+      }
+      if (rankStr == null) {
+        throw FormatException('Missing "rank" field. Available keys: ${json.keys.join(", ")}');
+      }
+      if (faceUp == null) {
+        throw FormatException('Missing "faceUp" field. Available keys: ${json.keys.join(", ")}');
+      }
+      
+      Suit? suit;
+      try {
+        suit = Suit.values.firstWhere((s) => s.toString() == suitStr);
+      } catch (e) {
+        throw FormatException('Invalid suit "$suitStr". Expected one of: ${Suit.values.map((s) => s.toString()).join(", ")}');
+      }
+      
+      Rank? rank;
+      try {
+        rank = Rank.values.firstWhere((r) => r.toString() == rankStr);
+      } catch (e) {
+        throw FormatException('Invalid rank "$rankStr". Expected one of: ${Rank.values.map((r) => r.toString()).join(", ")}');
+      }
+      
+      return Card(suit: suit, rank: rank, faceUp: faceUp);
+    } catch (e) {
+      debugPrint('❌ Card.fromJson ERROR: $e');
+      debugPrint('   Input JSON: $json');
+      debugPrint('   JSON types: ${json.map((k, v) => MapEntry(k, '${v.runtimeType}: $v'))}');
+      rethrow;
+    }
+  }
 
   Card({
     required this.suit,
