@@ -245,7 +245,124 @@ void registerTestHooksImpl(GameProvider provider) {
     );
   }));
 
-  // Expose the provider for advanced testing
+  // Get all foundation pile state for debugging
+  js_util.setProperty(hooks, 'getFoundationState', js_util.allowInterop(() {
+    return js_util.jsify(
+      List.generate(4, (i) {
+        final pile = provider.gameState.foundations[i];
+        final topCardMap = pile.topCard != null ? <String, dynamic>{
+          'suit': pile.topCard!.suit.name,
+          'rank': pile.topCard!.rank.name,
+          'faceUp': pile.topCard!.faceUp,
+        } : null;
+        
+        return <String, dynamic>{
+          'index': i,
+          'suit': pile.suit?.name,
+          'cardCount': pile.cards.length,
+          'isEmpty': pile.isEmpty,
+          'isComplete': pile.isComplete,
+          'topCard': topCardMap,
+          'cards': pile.cards.map((card) {
+            return <String, dynamic>{
+              'suit': card.suit.name,
+              'rank': card.rank.name,
+              'faceUp': card.faceUp,
+            };
+          }).toList(),
+        };
+      }),
+    );
+  }));
+
+  // Get waste state for debugging
+  js_util.setProperty(hooks, 'getWasteState', js_util.allowInterop(() {
+    return js_util.jsify(
+      provider.gameState.waste.map((card) {
+        return <String, dynamic>{
+          'suit': card.suit.name,
+          'rank': card.rank.name,
+          'faceUp': card.faceUp,
+        };
+      }).toList(),
+    );
+  }));
+
+  // Draw a card from stock to waste
+  Future<String> drawWasteCard() async {
+    try {
+      await waitForIdle();
+      await provider.drawCard();
+      await waitForIdle();
+      return 'success';
+    } catch (e) {
+      print('DRAW WASTE CARD ERROR: $e');
+      return 'error: $e';
+    }
+  }
+
+  js_util.setProperty(hooks, 'drawWasteCard', 
+    js_util.allowInterop(() => futureToPromise(drawWasteCard())));
+
+  // Move waste card to foundation
+  Future<String> moveWasteToFoundation(int foundationIndex) async {
+    try {
+      await waitForIdle();
+      
+      if (foundationIndex < 0 || foundationIndex >= 4) {
+        return 'invalid-foundation-index';
+      }
+      
+      await provider.moveWasteToFoundation(foundationIndex);
+      await waitForIdle();
+      
+      return 'success';
+    } catch (e) {
+      print('MOVE WASTE TO FOUNDATION ERROR: $e');
+      return 'error: $e';
+    }
+  }
+
+  js_util.setProperty(hooks, 'moveWasteToFoundation', 
+    js_util.allowInterop((int foundationIndex) => 
+      futureToPromise(moveWasteToFoundation(foundationIndex))));
+
+  // Add cards directly to waste for testing (bypasses normal game flow)
+  Future<Map<String, dynamic>> addCardToWaste(String suitName, String rankName) async {
+    try {
+      final suit = model.Suit.values.firstWhere((s) => s.name == suitName);
+      final rank = model.Rank.values.firstWhere((r) => r.name == rankName);
+      
+      final card = model.Card(suit: suit, rank: rank);
+      card.faceUp = true;
+      
+      provider.gameState.waste.add(card);
+      
+      final result = <String, dynamic>{
+        'success': true,
+        'message': 'Added $rankName of $suitName to waste',
+        'wasteLength': provider.gameState.waste.length,
+      };
+      
+      // Return directly without jsify to avoid type wrapping
+      return result;
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  js_util.setProperty(hooks, 'addCardToWaste', 
+    js_util.allowInterop((String suit, String rank) {
+      return futureToPromise(addCardToWaste(suit, rank).then((result) {
+        // Convert the result to a plain JS object
+        return js_util.jsify(result);
+      }));
+    }));
+
+  // Expose the provider for advanced testing (if needed)
   js_util.setProperty(hooks, '_provider', provider);
   
   // Expose Card constructor for testing
