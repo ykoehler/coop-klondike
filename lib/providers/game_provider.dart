@@ -808,7 +808,19 @@ class GameProvider extends ChangeNotifier {
   }
 
   bool get isGameWon => GameLogic.isGameWon(_gameState!);
-  bool get isGameStuck => GameLogic.isGameStuck(_gameState!);
+  
+  /// Checks if the game is stuck, but only when safe to do so.
+  /// Returns false if there are pending actions to avoid false positives during moves.
+  bool get isGameStuck {
+    // CRITICAL: Don't check for stuck state while moves are being processed
+    // This prevents false "game over" detection during card movements
+    if (_pendingActionCount > 0 || _isDragging) {
+      debugPrint('🎮 isGameStuck check DEFERRED: pendingActions=$_pendingActionCount, isDragging=$_isDragging');
+      return false;
+    }
+    return GameLogic.isGameStuck(_gameState!);
+  }
+  
   bool get mounted => _mounted;
   String get currentSeed => _gameState!.seed;
 

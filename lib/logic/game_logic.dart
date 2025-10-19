@@ -228,45 +228,56 @@ class GameLogic {
   /// - No tableau to tableau moves available
   /// - No tableau to foundation moves available
   /// - No foundation to tableau moves available
+  /// 
+  /// OPTIMIZATION: As soon as ONE valid move is found, returns false immediately.
+  /// Checks cheaper/faster operations first to fail fast.
   static bool isGameStuck(GameState state) {
     if (isGameWon(state)) return false;
 
-    // Check if can draw from stock or recycle waste
+    // Check if can draw from stock or recycle waste (fastest operations)
     if (canDrawCard(state, state.drawMode)) return false;
     if (canRecycleWaste(state)) return false;
 
-    // Check waste to tableau moves
+    // Check waste to tableau moves (fast - at most 7 checks)
     for (int i = 0; i < 7; i++) {
       if (canMoveWasteToTableau(state, i)) return false;
     }
 
-    // Check waste to foundation moves
+    // Check waste to foundation moves (fast - at most 4 checks)
     for (int i = 0; i < 4; i++) {
       if (canMoveWasteToFoundation(state, i)) return false;
     }
 
-    // Check tableau to tableau moves
-    for (int from = 0; from < 7; from++) {
-      for (int to = 0; to < 7; to++) {
-        if (from == to) continue;
-        int maxCount = state.tableau[from].cards.length;
-        for (int count = 1; count <= maxCount; count++) {
-          if (canMoveTableauToTableau(state, from, to, count)) return false;
-        }
+    // Check foundation to tableau moves (moderate - 4*7 checks)
+    // This often reveals available moves and is faster than tableau-to-tableau
+    for (int f = 0; f < 4; f++) {
+      for (int t = 0; t < 7; t++) {
+        if (canMoveFoundationToTableau(state, f, t)) return false;
       }
     }
 
-    // Check tableau to foundation moves
+    // Check tableau to foundation moves (moderate - 7*4 checks)
     for (int t = 0; t < 7; t++) {
       for (int f = 0; f < 4; f++) {
         if (canMoveTableauToFoundation(state, t, f)) return false;
       }
     }
 
-    // Check foundation to tableau moves
-    for (int f = 0; f < 4; f++) {
-      for (int t = 0; t < 7; t++) {
-        if (canMoveFoundationToTableau(state, f, t)) return false;
+    // Check tableau to tableau moves (most expensive - only if absolutely needed)
+    // Strategy: Check each source column's top card against all destinations first
+    for (int from = 0; from < 7; from++) {
+      if (state.tableau[from].isEmpty) continue;
+      
+      final sourceCards = state.tableau[from].cards;
+      int sourceLength = sourceCards.length;
+      
+      for (int to = 0; to < 7; to++) {
+        if (from == to) continue;
+        
+        // Try all possible card counts from this source, stopping at first valid move
+        for (int count = 1; count <= sourceLength; count++) {
+          if (canMoveTableauToTableau(state, from, to, count)) return false;
+        }
       }
     }
 
