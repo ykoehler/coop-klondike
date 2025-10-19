@@ -1,5 +1,6 @@
 import '../models/game_state.dart';
 import '../models/card.dart';
+import '../models/hint.dart';
 import 'package:flutter/foundation.dart';
 
 /// Contains the core game rules and move validation logic for Klondike Solitaire.
@@ -291,6 +292,152 @@ class GameLogic {
   /// Flips the top card of a tableau column if it's face-down.
   static void _flipTableauTopCard(GameState state, int index) {
     state.tableau[index].flipTopCard();
+  }
+
+  /// Generates a detailed hint with visual location information.
+  /// 
+  /// Returns null if no moves are available (game is stuck or won).
+  /// Returns CardHint with source and destination information for visual highlighting.
+  static CardHint? generateVisualHint(GameState state) {
+    if (isGameWon(state)) return null;
+    if (isGameStuck(state)) return null;
+
+    // Priority 1: Move to foundation (most valuable)
+    for (int t = 0; t < 7; t++) {
+      for (int f = 0; f < 4; f++) {
+        if (canMoveTableauToFoundation(state, t, f)) {
+          final card = state.tableau[t].topCard;
+          if (card != null) {
+            return CardHint(
+              description: 'Move to foundation',
+              type: HintType.moveTableauToFoundation,
+              card: card,
+              sourceLocation: HintLocation.tableau,
+              sourceIndex: t,
+              destinationLocation: HintLocation.foundation,
+              destinationIndex: f,
+            );
+          }
+        }
+      }
+    }
+
+    // Priority 1b: Move waste to foundation
+    for (int i = 0; i < 4; i++) {
+      if (canMoveWasteToFoundation(state, i)) {
+        final card = state.waste.last;
+        return CardHint(
+          description: 'Move to foundation',
+          type: HintType.moveWasteToFoundation,
+          card: card,
+          sourceLocation: HintLocation.waste,
+          sourceIndex: 0,
+          destinationLocation: HintLocation.foundation,
+          destinationIndex: i,
+        );
+      }
+    }
+
+    // Priority 2: Move tableau cards (creates opportunities)
+    for (int from = 0; from < 7; from++) {
+      if (state.tableau[from].isEmpty) continue;
+      
+      final sourceCard = state.tableau[from].topCard;
+      if (sourceCard == null || !sourceCard.faceUp) continue;
+
+      for (int to = 0; to < 7; to++) {
+        if (from == to) continue;
+        
+        // Try all possible card counts
+        int maxCount = state.tableau[from].cards.length;
+        for (int count = 1; count <= maxCount; count++) {
+          if (canMoveTableauToTableau(state, from, to, count)) {
+            return CardHint(
+              description: 'Move tableau card',
+              type: HintType.moveTableauToTableau,
+              card: sourceCard,
+              sourceLocation: HintLocation.tableau,
+              sourceIndex: from,
+              destinationLocation: HintLocation.tableau,
+              destinationIndex: to,
+            );
+          }
+        }
+      }
+    }
+
+    // Priority 3: Move waste to tableau
+    if (state.waste.isNotEmpty) {
+      final card = state.waste.last;
+      for (int i = 0; i < 7; i++) {
+        if (canMoveWasteToTableau(state, i)) {
+          return CardHint(
+            description: 'Move to tableau',
+            type: HintType.moveWasteToTableau,
+            card: card,
+            sourceLocation: HintLocation.waste,
+            sourceIndex: 0,
+            destinationLocation: HintLocation.tableau,
+            destinationIndex: i,
+          );
+        }
+      }
+    }
+
+    // Priority 4: Undo moves from foundation (open up cards)
+    for (int f = 0; f < 4; f++) {
+      for (int t = 0; t < 7; t++) {
+        if (canMoveFoundationToTableau(state, f, t)) {
+          final card = state.foundations[f].topCard;
+          if (card != null) {
+            return CardHint(
+              description: 'Undo from foundation',
+              type: HintType.moveFoundationToTableau,
+              card: card,
+              sourceLocation: HintLocation.foundation,
+              sourceIndex: f,
+              destinationLocation: HintLocation.tableau,
+              destinationIndex: t,
+            );
+          }
+        }
+      }
+    }
+
+    // Priority 5: Draw/recycle stock
+    if (canRecycleWaste(state)) {
+      return CardHint(
+        description: 'Recycle waste',
+        type: HintType.recycleWaste,
+        sourceLocation: HintLocation.waste,
+        sourceIndex: 0,
+        destinationLocation: HintLocation.stock,
+        destinationIndex: 0,
+      );
+    }
+
+    if (canDrawCard(state, state.drawMode)) {
+      return CardHint(
+        description: 'Draw cards',
+        type: HintType.drawFromStock,
+        sourceLocation: HintLocation.stock,
+        sourceIndex: 0,
+        destinationLocation: HintLocation.waste,
+        destinationIndex: 0,
+      );
+    }
+
+    return null;
+  }
+
+  /// Generates a hint for the next move to make progress.
+  /// 
+  /// Returns null if no moves are available (game is stuck or won).
+  /// Priority order: High-value moves (foundation) > Tableau moves > Draw from stock.
+  static String? generateHint(GameState state) {
+    final hint = generateVisualHint(state);
+    if (hint == null) return null;
+    return hint.description;
   }
 
   /// Logs stock operations and card integrity for debugging duplicate issues.

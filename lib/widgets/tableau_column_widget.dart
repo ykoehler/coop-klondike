@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
 import '../models/tableau_column.dart';
+import '../models/hint.dart';
 import '../providers/game_provider.dart';
 import '../utils/responsive_utils.dart';
 import 'card_widget.dart';
@@ -79,6 +80,8 @@ class TableauColumnWidget extends StatelessWidget {
             height: cardHeight,
             column: column,
             cardIndex: i,
+            hintLocation: HintLocation.tableau,
+            hintLocationIndex: columnIndex,
           ),
         ),
       );

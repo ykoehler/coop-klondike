@@ -137,12 +137,17 @@ class FirebaseService {
 
   // Set game lock
   Future<void> setGameLock(String gameId, String playerId, bool isLocked) async {
-    await _gamesRef.child('$gameId/lock').set({
-      'isLocked': isLocked,
-      'locked': isLocked, // legacy compatibility
-      'playerId': playerId,
-      'timestamp': ServerValue.timestamp,
-    });
+    try {
+      await _gamesRef.child('$gameId/lock').set({
+        'isLocked': isLocked,
+        'locked': isLocked, // legacy compatibility
+        'playerId': playerId,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+    } catch (e) {
+      // Log but don't rethrow - lock failures shouldn't break gameplay
+      debugPrint('⚠️ Firebase setGameLock error: $e');
+    }
   }
 
   // Listen to game lock changes

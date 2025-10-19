@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
+import '../models/hint.dart';
 import '../models/tableau_column.dart';
 import '../utils/responsive_utils.dart';
 import '../providers/game_provider.dart';
+import 'hint_highlighted_card.dart';
 
 class CardWidget extends StatefulWidget {
   final card_model.Card card;
@@ -13,6 +15,8 @@ class CardWidget extends StatefulWidget {
   final double? height;
   final TableauColumn? column;
   final int? cardIndex;
+  final HintLocation? hintLocation;
+  final int? hintLocationIndex;
 
   const CardWidget({
     super.key,
@@ -22,6 +26,8 @@ class CardWidget extends StatefulWidget {
     this.height,
     this.column,
     this.cardIndex,
+    this.hintLocation,
+    this.hintLocationIndex,
   });
 
   @override
@@ -105,13 +111,23 @@ class _CardWidgetState extends State<CardWidget> {
         data: widget.card,
         feedback: Transform.scale(
           scale: context.dragFeedbackScale,
-          child: feedbackWidget,
+          child: feedbackWidget, // Use unwrapped feedback during drag
         ),
         childWhenDragging: Opacity(
           opacity: 0.5,
+          child: HintHighlightedCard(
+            card: widget.card,
+            location: widget.hintLocation,
+            locationIndex: widget.hintLocationIndex,
+            child: cardContent,
+          ),
+        ),
+        child: HintHighlightedCard(
+          card: widget.card,
+          location: widget.hintLocation,
+          locationIndex: widget.hintLocationIndex,
           child: cardContent,
         ),
-        child: cardContent,
         onDragStarted: () async {
           try {
             // Capture RenderBox before async operation to avoid context issues
@@ -191,7 +207,13 @@ class _CardWidgetState extends State<CardWidget> {
       );
     }
 
-    return cardContent;
+    // Wrap non-draggable cards with hint highlighting
+    return HintHighlightedCard(
+      card: widget.card,
+      location: widget.hintLocation,
+      locationIndex: widget.hintLocationIndex,
+      child: cardContent,
+    );
   }
 
   Widget _buildCardContent(BuildContext context, double cardWidth, double cardHeight, double tableauSpacing) {
