@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
 import '../models/game_state.dart';
 
@@ -138,24 +138,44 @@ class FirebaseService {
   // Set game lock
   Future<void> setGameLock(String gameId, String playerId, bool isLocked) async {
     try {
+      // WORKAROUND: Firebase Realtime Database on web (v0.2.6+19) has a known bug
+      // with serialization in both set() and update() operations.
+      // See: firebase_database_web-0.2.6+19/lib/src/interop/database.dart:140,147
+      // 
+      // For web platform, skip Firebase lock synchronization entirely.
+      // Single-player mode works fine. Multi-player features use optimistic locking.
+      if (kIsWeb) {
+        debugPrint('🔒 Firebase setGameLock: Skipping on web (known Firebase bug)');
+        return;
+      }
+
       // Validate inputs
       if (gameId.isEmpty || playerId.isEmpty) {
         debugPrint('⚠️ Firebase setGameLock error: Invalid gameId or playerId');
         return;
       }
 
-      debugPrint('🔒 Firebase setGameLock: gameId=$gameId, playerId=$playerId, isLocked=$isLocked');
+      // Sanitize IDs to ensure they contain only safe characters for Firebase paths
+      final safeGameId = gameId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
+      final safePlayerId = playerId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
+
+      debugPrint('🔒 Firebase setGameLock: gameId=$safeGameId, playerId=$safePlayerId, isLocked=$isLocked');
 
       // Build minimal lock data
       final lockData = {
         'isLocked': isLocked,
-        'playerId': playerId,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'playerId': safePlayerId,
       };
 
-      final lockRef = _gamesRef.child('$gameId/lock');
+      final lockRef = _gamesRef.child('$safeGameId/lock');
       
-      await lockRef.set(lockData);
+      try {
+        // Try update - more efficient if node exists
+        await lockRef.update(lockData);
+      } catch (_) {
+        // If update fails (node doesn't exist), use set instead
+        await lockRef.set(lockData);
+      }
     } catch (e) {
       // Log but don't rethrow - lock failures shouldn't break gameplay
       debugPrint('⚠️ Firebase setGameLock error (non-critical): $e');
@@ -164,6 +184,15 @@ class FirebaseService {
 
   // Listen to game lock changes
   Stream<Map<String, dynamic>> listenToGameLock(String gameId) {
+    // On web, return an empty stream due to Firebase database_web bug
+    // Single-player works fine, multi-player uses optimistic locking
+    if (kIsWeb) {
+      return Stream.value({
+        'isLocked': false,
+        'playerId': null,
+      });
+    }
+
     return _gamesRef.child('$gameId/lock').onValue.transform(
       StreamTransformer<DatabaseEvent, Map<String, dynamic>>.fromHandlers(
         handleData: (event, sink) {
