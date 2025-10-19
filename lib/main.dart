@@ -8,7 +8,6 @@ import 'screens/svg_debug_screen.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'models/game_state.dart';
 import 'services/firebase_service.dart';
 import 'utils/svg_cache.dart';
 
@@ -113,27 +112,11 @@ class _KlondikeAppState extends State<KlondikeApp> {
       ),
       GoRoute(
         path: '/',
-        builder: (context, state) {
-          // Create a new game state when hitting the root
-          final gameState = GameState();
-          return ChangeNotifierProvider(
-            create: (context) => GameProvider(
-              firebaseService: FirebaseService(),
-              gameId: gameState.gameId,
-              isInitialSetup: true,
-            ),
-            child: Builder(
-              builder: (context) {
-                // Redirect to the game URL after provider is ready
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (context.mounted) {
-                    context.go('/game/${gameState.gameId}');
-                  }
-                });
-                return const GameScreen();
-              },
-            ),
-          );
+        redirect: (context, state) {
+          // Generate a new game ID and redirect immediately
+          // This avoids creating and dealing cards twice
+          final gameId = GameProvider.createNewGameId();
+          return '/game/$gameId';
         },
       ),
     ],

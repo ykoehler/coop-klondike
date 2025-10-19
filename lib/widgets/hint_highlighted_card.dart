@@ -39,7 +39,7 @@ class HintHighlightedCard extends StatelessWidget {
         }
 
         bool isSourceCard = false;
-        bool isDestinationLocation = false;
+        bool isDestinationCard = false;
 
         // Check if this card is the hint source
         if (hint.card != null &&
@@ -50,13 +50,35 @@ class HintHighlightedCard extends StatelessWidget {
           isSourceCard = true;
         }
 
-        // Check if this location is the hint destination
+        // Check if this is the hint destination
+        // IMPORTANT: For tableau columns, only the TOP card should be highlighted as the destination.
+        // This prevents highlighting all cards in the column including face-down cards.
         if (hint.destinationLocation == location &&
             hint.destinationIndex == locationIndex) {
-          isDestinationLocation = true;
+          if (hint.destinationLocation == HintLocation.tableau) {
+            // For tableau destinations, only highlight the top card of the destination column.
+            // Get the game state to check if this card is the top card of the destination column.
+            final gameState = provider.gameState;
+            if (locationIndex != null && 
+                locationIndex! >= 0 && 
+                locationIndex! < gameState.tableau.length) {
+              final destinationColumn = gameState.tableau[locationIndex!];
+              if (destinationColumn.topCard != null &&
+                  destinationColumn.topCard!.suit == card!.suit &&
+                  destinationColumn.topCard!.rank == card!.rank) {
+                isDestinationCard = true;
+              }
+            }
+            // If the tableau column is empty, highlight nothing (unless it's a King destination)
+            // The UI will show the drop zone is valid anyway
+          } else {
+            // For non-tableau locations (waste, stock, foundation), 
+            // highlight the single card in that location
+            isDestinationCard = true;
+          }
         }
 
-        if (!isSourceCard && !isDestinationLocation) {
+        if (!isSourceCard && !isDestinationCard) {
           return child;
         }
 

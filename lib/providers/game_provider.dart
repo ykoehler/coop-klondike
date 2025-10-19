@@ -139,6 +139,11 @@ class GameProvider extends ChangeNotifier {
     return '$part1-$part2';
   }
 
+  /// Public utility to generate a new game ID
+  static String createNewGameId() {
+    return _generateGameId();
+  }
+
   void _applyPendingStateIfAvailable({bool notify = false}) {
     if (_pendingStateUpdate != null) {
       debugPrint(
@@ -526,6 +531,12 @@ class GameProvider extends ChangeNotifier {
 
   Future<bool> acquireLock(String action) async {
     try {
+      // Safety check: ensure we have valid game and player IDs
+      if (_gameId.isEmpty || _playerId.isEmpty) {
+        debugPrint('⚠️ Warning: Cannot acquire lock - invalid gameId or playerId');
+        return true; // Optimistic - assume we have the lock
+      }
+
       if (_currentLock?.isLocked ?? false) {
         if (_currentLock?.isLockExpired ?? false) {
           await firebaseService.setGameLock(_gameId, _playerId, false);
@@ -547,6 +558,12 @@ class GameProvider extends ChangeNotifier {
 
   Future<void> releaseLock() async {
     try {
+      // Safety check: ensure we have valid IDs
+      if (_gameId.isEmpty || _playerId.isEmpty) {
+        debugPrint('⚠️ Warning: Cannot release lock - invalid gameId or playerId');
+        return;
+      }
+
       await firebaseService.setGameLock(_gameId, _playerId, false);
     } catch (e, stackTrace) {
       // Log but don't rethrow - lock release failures shouldn't break gameplay
