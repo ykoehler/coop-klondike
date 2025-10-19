@@ -144,27 +144,18 @@ class FirebaseService {
         return;
       }
 
-      // Sanitize IDs to ensure they contain only safe characters for Firebase paths
-      final safeGameId = gameId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
-      final safePlayerId = playerId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
-
-      debugPrint('🔒 Firebase setGameLock: gameId=$safeGameId, playerId=$safePlayerId, isLocked=$isLocked');
+      debugPrint('🔒 Firebase setGameLock: gameId=$gameId, playerId=$playerId, isLocked=$isLocked');
 
       // Build minimal lock data
       final lockData = {
         'isLocked': isLocked,
-        'playerId': safePlayerId,
+        'playerId': playerId,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
 
-      final lockRef = _gamesRef.child('$safeGameId/lock');
+      final lockRef = _gamesRef.child('$gameId/lock');
       
-      try {
-        // Try update - more efficient if node exists
-        await lockRef.update(lockData);
-      } catch (_) {
-        // If update fails (node doesn't exist), use set instead
-        await lockRef.set(lockData);
-      }
+      await lockRef.set(lockData);
     } catch (e) {
       // Log but don't rethrow - lock failures shouldn't break gameplay
       debugPrint('⚠️ Firebase setGameLock error (non-critical): $e');

@@ -39,7 +39,7 @@ class HintHighlightedCard extends StatelessWidget {
         }
 
         bool isSourceCard = false;
-        bool isDestinationCard = false;
+        bool isDestinationLocation = false;
 
         // Check if this card is the hint source
         if (hint.card != null &&
@@ -66,7 +66,7 @@ class HintHighlightedCard extends StatelessWidget {
               if (destinationColumn.topCard != null &&
                   destinationColumn.topCard!.suit == card!.suit &&
                   destinationColumn.topCard!.rank == card!.rank) {
-                isDestinationCard = true;
+                isDestinationLocation = true;
               }
             }
             // If the tableau column is empty, highlight nothing (unless it's a King destination)
@@ -74,11 +74,11 @@ class HintHighlightedCard extends StatelessWidget {
           } else {
             // For non-tableau locations (waste, stock, foundation), 
             // highlight the single card in that location
-            isDestinationCard = true;
+            isDestinationLocation = true;
           }
         }
 
-        if (!isSourceCard && !isDestinationCard) {
+        if (!isSourceCard && !isDestinationLocation) {
           return child;
         }
 
