@@ -5,6 +5,7 @@ import '../models/game_state.dart';
 import '../models/game_lock.dart';
 import '../models/drag_state.dart';
 import '../models/deck.dart';
+import '../models/hint.dart';
 import '../logic/game_logic.dart';
 import '../services/firebase_service.dart';
 import '../utils/seed_generator.dart';
@@ -28,6 +29,10 @@ class GameProvider extends ChangeNotifier {
   final String? _providedSeedStr;
   bool _isDragging = false;
   GameState? _pendingStateUpdate;
+  Timer? _inactivityTimer;
+  CardHint? _currentVisualHint;
+  bool? _cachedIsGameWon;
+  bool? _cachedIsGameStuck;
 
   /// Safely access game state. If not yet initialized, returns a temporary instance.
   /// This ensures the UI doesn't crash during initialization while we load from Firebase.
@@ -46,6 +51,7 @@ class GameProvider extends ChangeNotifier {
   Deck get deck => gameState.stock; // Use the getter instead of direct access
   bool get isInitialSetup => _isInitialSetup;
   bool get hasPendingAction => _pendingActionCount > 0;
+  CardHint? get currentVisualHint => _currentVisualHint;
   
   // Allow test hooks to mark setup as complete
   void markSetupComplete() {
@@ -131,6 +137,11 @@ class GameProvider extends ChangeNotifier {
       List.generate(5, (_) => chars.codeUnitAt(random.nextInt(chars.length))),
     );
     return '$part1-$part2';
+  }
+
+  /// Public utility to generate a new game ID
+  static String createNewGameId() {
+    return _generateGameId();
   }
 
   void _applyPendingStateIfAvailable({bool notify = false}) {
@@ -272,6 +283,10 @@ class GameProvider extends ChangeNotifier {
       mutateState();
       debugPrint('🔒 AFTER MUTATION [$actionName]: stock=${_gameState!.stock.length}, waste=${_gameState!.waste.length}');
       _logMoveIntegrity(actionName);
+      
+      // Clear cached game over state since the state changed
+      _cachedIsGameWon = null;
+      _cachedIsGameStuck = null;
 
       if (_mounted) {
         notifyListeners();
@@ -293,6 +308,9 @@ class GameProvider extends ChangeNotifier {
       if (_pendingActionCount > 0) {
         _pendingActionCount--;
       }
+
+      // Reset inactivity tracker after any move
+      _resetInactivityTracker();
 
       if (_mounted) {
         notifyListeners();
@@ -345,6 +363,9 @@ class GameProvider extends ChangeNotifier {
       _isInitializing = false;
       if (_mounted) notifyListeners();
 
+      // Start the inactivity tracker for hint display
+      _resetInactivityTracker();
+
       // Subscribe to game state changes
       _gameSubscription = firebaseService
           .listenToGame(_gameId)
@@ -380,6 +401,9 @@ class GameProvider extends ChangeNotifier {
 
                 debugPrint('📡 FIREBASE UPDATE: Applied immediately');
                 _gameState = newState;
+                // Clear cached game over state since the state changed
+                _cachedIsGameWon = null;
+                _cachedIsGameStuck = null;
                 if (_mounted) {
                   notifyListeners();
                 }
@@ -506,20 +530,46 @@ class GameProvider extends ChangeNotifier {
   }
 
   Future<bool> acquireLock(String action) async {
-    if (_currentLock?.isLocked ?? false) {
-      if (_currentLock?.isLockExpired ?? false) {
-        await firebaseService.setGameLock(_gameId, _playerId, false);
-      } else {
-        return false;
+    try {
+      // Safety check: ensure we have valid game and player IDs
+      if (_gameId.isEmpty || _playerId.isEmpty) {
+        debugPrint('⚠️ Warning: Cannot acquire lock - invalid gameId or playerId');
+        return true; // Optimistic - assume we have the lock
       }
-    }
 
-    await firebaseService.setGameLock(_gameId, _playerId, true);
-    return true;
+      if (_currentLock?.isLocked ?? false) {
+        if (_currentLock?.isLockExpired ?? false) {
+          await firebaseService.setGameLock(_gameId, _playerId, false);
+        } else {
+          return false;
+        }
+      }
+
+      await firebaseService.setGameLock(_gameId, _playerId, true);
+      return true;
+    } catch (e, stackTrace) {
+      // If lock acquisition fails, log it but allow gameplay to continue
+      // This can happen if Firebase is temporarily unavailable
+      debugPrint('⚠️ Warning: Failed to acquire lock [$action]: $e');
+      debugPrint(stackTrace.toString());
+      return true; // Optimistic - assume we have the lock
+    }
   }
 
   Future<void> releaseLock() async {
-    await firebaseService.setGameLock(_gameId, _playerId, false);
+    try {
+      // Safety check: ensure we have valid IDs
+      if (_gameId.isEmpty || _playerId.isEmpty) {
+        debugPrint('⚠️ Warning: Cannot release lock - invalid gameId or playerId');
+        return;
+      }
+
+      await firebaseService.setGameLock(_gameId, _playerId, false);
+    } catch (e, stackTrace) {
+      // Log but don't rethrow - lock release failures shouldn't break gameplay
+      debugPrint('⚠️ Warning: Failed to release lock: $e');
+      debugPrint(stackTrace.toString());
+    }
   }
 
   Future<void> _updateGameState() async {
@@ -661,6 +711,10 @@ class GameProvider extends ChangeNotifier {
         debugPrint('🎴 DRAW CARD: After mutation (stock=${_gameState!.stock.length}, waste=${_gameState!.waste.length})');
       },
     );
+    
+    // Check game over state when stock might be empty
+    _checkGameOverState();
+    
     debugPrint('🎴 DRAW CARD: Completed');
   }
 
@@ -687,6 +741,10 @@ class GameProvider extends ChangeNotifier {
       lockName: 'recycleWaste',
       mutateState: () => GameLogic.recycleWaste(_gameState!),
     );
+    
+    // Check game over state when stock becomes empty
+    _checkGameOverState();
+    
     debugPrint('🔄 RECYCLE: Complete');
   }
 
@@ -807,14 +865,104 @@ class GameProvider extends ChangeNotifier {
     );
   }
 
-  bool get isGameWon => GameLogic.isGameWon(_gameState!);
-  bool get isGameStuck => GameLogic.isGameStuck(_gameState!);
+  /// Returns the cached game won status. Only updated when specifically checked.
+  bool get isGameWon {
+    if (_cachedIsGameWon != null) {
+      return _cachedIsGameWon!;
+    }
+    // Fall back to checking if needed (shouldn't happen in normal flow)
+    return GameLogic.isGameWon(_gameState!);
+  }
+  
+  /// Returns the cached game stuck status. Only updated when specifically checked.
+  bool get isGameStuck {
+    if (_cachedIsGameStuck != null) {
+      return _cachedIsGameStuck!;
+    }
+    // Fall back to checking if needed (shouldn't happen in normal flow)
+    if (_pendingActionCount > 0 || _isDragging) {
+      return false;
+    }
+    return GameLogic.isGameStuck(_gameState!);
+  }
+
+  /// Performs an expensive check of game over conditions.
+  /// Only call this when we know it's safe and necessary (stock empty or hint generation).
+  void _checkGameOverState() {
+    if (_gameState == null) {
+      _cachedIsGameWon = false;
+      _cachedIsGameStuck = false;
+      return;
+    }
+
+    // Only check when safe to do so
+    if (_pendingActionCount > 0 || _isDragging) {
+      debugPrint('🎮 Game over check DEFERRED: pendingActions=$_pendingActionCount, isDragging=$_isDragging');
+      return;
+    }
+
+    _cachedIsGameWon = GameLogic.isGameWon(_gameState!);
+    _cachedIsGameStuck = GameLogic.isGameStuck(_gameState!);
+    
+    if (_cachedIsGameWon == true) {
+      debugPrint('🎮 GAME WON! 🎉');
+    } else if (_cachedIsGameStuck == true) {
+      debugPrint('🎮 GAME STUCK - Game Over');
+    }
+  }
+  
   bool get mounted => _mounted;
   String get currentSeed => _gameState!.seed;
+
+  /// Resets the inactivity timer and clears any hint.
+  /// Called whenever the player makes a move.
+  void _resetInactivityTracker() {
+    _currentVisualHint = null;
+    _inactivityTimer?.cancel();
+    
+    // Start a new inactivity timer
+    _inactivityTimer = Timer(const Duration(minutes: 1), () {
+      if (_mounted && !isGameWon && !isGameStuck) {
+        _generateAndShowVisualHint();
+      }
+    });
+    
+    if (_mounted) {
+      notifyListeners();
+    }
+  }
+
+  /// Generates a visual hint based on the current game state.
+  void _generateAndShowVisualHint() {
+    if (!_mounted || _gameState == null) return;
+    
+    // Check game over state when generating hints
+    _checkGameOverState();
+    
+    final hint = GameLogic.generateVisualHint(_gameState!);
+    if (hint != null && hint != _currentVisualHint) {
+      _currentVisualHint = hint;
+      debugPrint('💡 VISUAL HINT: ${hint.description} (${hint.sourceLocation} → ${hint.destinationLocation})');
+      if (_mounted) {
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Clears the current visual hint.
+  void clearVisualHint() {
+    if (_currentVisualHint != null) {
+      _currentVisualHint = null;
+      if (_mounted) {
+        notifyListeners();
+      }
+    }
+  }
 
   @override
   void dispose() {
     _mounted = false;
+    _inactivityTimer?.cancel();
     _gameSubscription?.cancel();
     _lockSubscription?.cancel();
     _dragSubscription?.cancel();

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../models/game_state.dart';
 
@@ -137,12 +137,38 @@ class FirebaseService {
 
   // Set game lock
   Future<void> setGameLock(String gameId, String playerId, bool isLocked) async {
-    await _gamesRef.child('$gameId/lock').set({
-      'isLocked': isLocked,
-      'locked': isLocked, // legacy compatibility
-      'playerId': playerId,
-      'timestamp': ServerValue.timestamp,
-    });
+    try {
+      // Validate inputs
+      if (gameId.isEmpty || playerId.isEmpty) {
+        debugPrint('⚠️ Firebase setGameLock error: Invalid gameId or playerId');
+        return;
+      }
+
+      // Sanitize IDs to ensure they contain only safe characters for Firebase paths
+      final safeGameId = gameId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
+      final safePlayerId = playerId.replaceAll(RegExp(r'[.#\[\]$]'), '_');
+
+      debugPrint('🔒 Firebase setGameLock: gameId=$safeGameId, playerId=$safePlayerId, isLocked=$isLocked');
+
+      // Build minimal lock data
+      final lockData = {
+        'isLocked': isLocked,
+        'playerId': safePlayerId,
+      };
+
+      final lockRef = _gamesRef.child('$safeGameId/lock');
+      
+      try {
+        // Try update - more efficient if node exists
+        await lockRef.update(lockData);
+      } catch (_) {
+        // If update fails (node doesn't exist), use set instead
+        await lockRef.set(lockData);
+      }
+    } catch (e) {
+      // Log but don't rethrow - lock failures shouldn't break gameplay
+      debugPrint('⚠️ Firebase setGameLock error (non-critical): $e');
+    }
   }
 
   // Listen to game lock changes
@@ -154,9 +180,7 @@ class FirebaseService {
             if (event.snapshot.value == null) {
               sink.add({
                 'isLocked': false,
-                'locked': false,
                 'playerId': null,
-                'timestamp': DateTime.now().millisecondsSinceEpoch,
               });
               return;
             }

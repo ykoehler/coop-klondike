@@ -77,6 +77,42 @@ void main() {
       expect(GameLogic.canMoveWasteToFoundation(state, 0), false);
     });
 
+    test('can move sequential cards to foundation (A -> 2 -> 3 bug reproduction)', () {
+      // This test reproduces the reported bug where dragging 3 to foundation
+      // fails after A and 2 have been placed
+      
+      // Step 1: Move Ace of hearts to foundation
+      state.waste.clear();
+      final ace = Card(suit: Suit.hearts, rank: Rank.ace);
+      state.waste.add(ace);
+
+      expect(GameLogic.canMoveWasteToFoundation(state, 0), true);
+      GameLogic.moveWasteToFoundation(state, 0);
+      expect(state.foundations[0].topCard!.rank, Rank.ace);
+      expect(state.foundations[0].cards.length, 1);
+
+      // Step 2: Move 2 of hearts to foundation
+      state.waste.clear();
+      final two = Card(suit: Suit.hearts, rank: Rank.two);
+      state.waste.add(two);
+
+      expect(GameLogic.canMoveWasteToFoundation(state, 0), true);
+      GameLogic.moveWasteToFoundation(state, 0);
+      expect(state.foundations[0].topCard!.rank, Rank.two);
+      expect(state.foundations[0].cards.length, 2);
+
+      // Step 3: Move 3 of hearts to foundation (THIS IS WHERE THE BUG WOULD OCCUR)
+      state.waste.clear();
+      final three = Card(suit: Suit.hearts, rank: Rank.three);
+      state.waste.add(three);
+
+      expect(GameLogic.canMoveWasteToFoundation(state, 0), true, 
+        reason: 'BUG: 3 should be able to move to foundation after A and 2');
+      GameLogic.moveWasteToFoundation(state, 0);
+      expect(state.foundations[0].topCard!.rank, Rank.three);
+      expect(state.foundations[0].cards.length, 3);
+    });
+
     test('canMoveTableauToTableau and moveTableauToTableau', () {
       state.tableau[0].cards.clear();
       state.tableau[0].addCard(Card(suit: Suit.spades, rank: Rank.queen, faceUp: true));

@@ -6,6 +6,7 @@ import '../providers/game_provider.dart';
 import '../utils/responsive_utils.dart';
 import 'card_widget.dart';
 import '../models/card.dart' as card_model;
+import '../models/hint.dart';
 
 class StockPileWidget extends StatelessWidget {
   const StockPileWidget({super.key});
@@ -91,6 +92,8 @@ class WastePileWidget extends StatelessWidget {
                   draggable: true,
                   width: cardWidth,
                   height: cardHeight,
+                  hintLocation: HintLocation.waste,
+                  hintLocationIndex: 0,
                 )
               : Container(
                   decoration: BoxDecoration(

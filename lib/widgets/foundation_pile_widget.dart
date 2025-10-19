@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/card.dart' as card_model;
 import '../models/foundation_pile.dart';
+import '../models/hint.dart';
 import '../providers/game_provider.dart';
 import '../utils/responsive_utils.dart';
 import 'card_widget.dart';
@@ -49,6 +50,8 @@ class _FoundationPileWidgetState extends State<FoundationPileWidget> {
                   draggable: false,
                   width: cardWidth,
                   height: cardHeight,
+                  hintLocation: HintLocation.foundation,
+                  hintLocationIndex: widget.pileIndex,
                 ),
         );
       },
