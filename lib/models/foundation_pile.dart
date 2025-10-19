@@ -1,5 +1,6 @@
 import 'card.dart';
 import '../utils/json_utils.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 class FoundationPile {
   Suit? suit;
@@ -11,28 +12,40 @@ class FoundationPile {
   };
 
   static FoundationPile fromJson(Map<String, dynamic> json) {
-    final suitString = json['suit'] as String?;
-    Suit? parsedSuit;
-    if (suitString != null) {
-      for (final suit in Suit.values) {
-        if (suit.toString() == suitString) {
-          parsedSuit = suit;
-          break;
+    try {
+      final suitString = json['suit'] as String?;
+      Suit? parsedSuit;
+      if (suitString != null) {
+        for (final suit in Suit.values) {
+          if (suit.toString() == suitString) {
+            parsedSuit = suit;
+            break;
+          }
         }
       }
+      final pile = FoundationPile(
+        suit: parsedSuit,
+      );
+      if (json.containsKey('cards') && json['cards'] != null) {
+        final cardsData = json['cards'];
+        debugPrint('  🏛️  FOUNDATIONPILE fromJson: cards field type = ${cardsData.runtimeType}');
+        
+        pile.cards = normalizeMapList(cardsData)
+            .map((card) => Card.fromJson(card))
+            .toList();
+        
+        debugPrint('  🏛️  FOUNDATIONPILE fromJson: Loaded ${pile.cards.length} cards');
+      }
+      if (pile.suit == null && pile.cards.isNotEmpty) {
+        pile.suit = pile.cards.first.suit;
+      }
+      return pile;
+    } catch (e, stackTrace) {
+      debugPrint('  ❌ FOUNDATIONPILE fromJson ERROR: $e');
+      debugPrint('     Input JSON: ${json.toString().substring(0, 200)}...');
+      debugPrint('     Stack trace: $stackTrace');
+      rethrow;
     }
-    final pile = FoundationPile(
-      suit: parsedSuit,
-    );
-    if (json.containsKey('cards') && json['cards'] != null) {
-      pile.cards = normalizeMapList(json['cards'])
-          .map((card) => Card.fromJson(card))
-          .toList();
-    }
-    if (pile.suit == null && pile.cards.isNotEmpty) {
-      pile.suit = pile.cards.first.suit;
-    }
-    return pile;
   }
 
   FoundationPile({this.suit});

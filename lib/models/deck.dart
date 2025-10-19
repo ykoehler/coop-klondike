@@ -20,18 +20,30 @@ class Deck {
   };
 
   static Deck fromJson(Map<String, dynamic> json) {
-    // Use named constructor to avoid initializing a full deck
-    final deck = Deck._empty();
-    if (json.containsKey('cards') && json['cards'] != null) {
-      final normalizedCards = normalizeMapList(json['cards']);
-      deck._cards = normalizedCards
-          .map((card) => Card.fromJson(card))
-          .toList();
-      debugPrint('  📦 DECK fromJson: Loaded ${deck._cards.length} cards from JSON');
-    } else {
-      debugPrint('  ⚠️  DECK fromJson: No cards in JSON, deck will be empty');
+    try {
+      // Use named constructor to avoid initializing a full deck
+      final deck = Deck._empty();
+      if (json.containsKey('cards') && json['cards'] != null) {
+        final cardsData = json['cards'];
+        debugPrint('  📦 DECK fromJson: cards field type = ${cardsData.runtimeType}');
+        
+        final normalizedCards = normalizeMapList(cardsData);
+        debugPrint('  📦 DECK fromJson: Normalized to ${normalizedCards.length} card(s)');
+        
+        deck._cards = normalizedCards
+            .map((card) => Card.fromJson(card))
+            .toList();
+        debugPrint('  📦 DECK fromJson: Loaded ${deck._cards.length} cards from JSON');
+      } else {
+        debugPrint('  ⚠️  DECK fromJson: No cards in JSON, deck will be empty');
+      }
+      return deck;
+    } catch (e, stackTrace) {
+      debugPrint('  ❌ DECK fromJson ERROR: $e');
+      debugPrint('     Input JSON keys: ${json.keys.toList()}');
+      debugPrint('     Stack trace: $stackTrace');
+      rethrow;
     }
-    return deck;
   }
 
   /// Private constructor for deserialization that doesn't initialize cards
