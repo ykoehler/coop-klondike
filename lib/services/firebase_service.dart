@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../models/game_state.dart';
 
@@ -138,17 +138,6 @@ class FirebaseService {
   // Set game lock
   Future<void> setGameLock(String gameId, String playerId, bool isLocked) async {
     try {
-      // WORKAROUND: Firebase Realtime Database on web (v0.2.6+19) has a known bug
-      // with serialization in both set() and update() operations.
-      // See: firebase_database_web-0.2.6+19/lib/src/interop/database.dart:140,147
-      // 
-      // For web platform, skip Firebase lock synchronization entirely.
-      // Single-player mode works fine. Multi-player features use optimistic locking.
-      if (kIsWeb) {
-        debugPrint('🔒 Firebase setGameLock: Skipping on web (known Firebase bug)');
-        return;
-      }
-
       // Validate inputs
       if (gameId.isEmpty || playerId.isEmpty) {
         debugPrint('⚠️ Firebase setGameLock error: Invalid gameId or playerId');
@@ -184,15 +173,6 @@ class FirebaseService {
 
   // Listen to game lock changes
   Stream<Map<String, dynamic>> listenToGameLock(String gameId) {
-    // On web, return an empty stream due to Firebase database_web bug
-    // Single-player works fine, multi-player uses optimistic locking
-    if (kIsWeb) {
-      return Stream.value({
-        'isLocked': false,
-        'playerId': null,
-      });
-    }
-
     return _gamesRef.child('$gameId/lock').onValue.transform(
       StreamTransformer<DatabaseEvent, Map<String, dynamic>>.fromHandlers(
         handleData: (event, sink) {
